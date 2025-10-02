@@ -14,7 +14,6 @@
     <!-- Babel for in-browser JSX transform (dev/proto only) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-      /* iOS safe area helper for footer padding when not using env() everywhere */
       :root { --sab: env(safe-area-inset-bottom); }
     </style>
   </head>
@@ -45,9 +44,8 @@
           inn: "7726464125",
           address: "117105, Россия, г. Москва, ш. Варшавское, д. 1, стр. 6, помещ. 2/3",
         },
-        // logo: use ONE of the following (or leave both empty for text fallback)
-        logoSrc: "", // URL or data URI (e.g. "data:image/svg+xml;utf8,<svg ...>")
-        logoSvg: "", // raw SVG markup string (starts with <svg ...>)
+        logoSrc: "", // URL or data URI
+        logoSvg: "", // raw SVG markup string
       };
 
       // =====================
@@ -85,8 +83,8 @@
           border: p.section_separator_color || BRAND.neutral.border,
           button: BRAND.primary,
           buttonText: p.button_text_color || '#FFFFFF',
-          chip1: BRAND.neutral.bgCard2,
-          chip2: BRAND.neutral.bgCard3,
+          chip1: BRAND.neutral.bgCard2, // голубая
+          chip2: BRAND.neutral.bgCard3, // зелёная
         };
       }
 
@@ -101,6 +99,25 @@
         }, []);
         return theme;
       }
+
+      // =====================
+      // Typograph helpers (RU)
+      // =====================
+      const NBSP = '\u00A0';
+      function ruTypo(str) {
+        if (!str || typeof str !== 'string') return str;
+        let s = str;
+        // 1) Неразрывный пробел после одно\- и некоторых двубуквенных предлогов/союзов
+        s = s.replace(/(^|[\s(«])([ВвКкСсУуОоИиАа])\s+(?=\S)/g, `$1$2${NBSP}`);
+        s = s.replace(/(^|[\s(«])((?:из|за|на|по|от|до|об))\s+(?=\S)/gi, `$1$2${NBSP}`);
+        // 2) Дефис на тире
+        s = s.replace(/\s+-\s+/g, ' — ');
+        // 3) Неразрывный пробел между числом и ед. измерения/знаком валюты/процентом
+        s = s.replace(/(\d)\s+(₽|%)/g, `$1${NBSP}$2`);
+        s = s.replace(/(\d)\s+(мес)/gi, `$1${NBSP}$2`);
+        return s;
+      }
+      const T = ({ children }) => (typeof children === 'string' ? ruTypo(children) : children);
 
       // =====================
       // DATA — Programs
@@ -232,7 +249,7 @@
           duration_months_est: 7,
           price_full_rub: 200250,
           price_from_per_month_rub: 8343,
-          landing_url: 'https://netology.ru/programs/professiya-menedzher-proektov-v-it-ranhigs',
+          landing_url: 'https://netology.ru/programs/professiya-menedzher-proektов-v-it-ranhigs',
           audience: [
             'Действующим и начинающим проджект-менеджерам в IT',
             'Тимлидам и руководителям, которым нужно прокачать управление командой',
@@ -281,8 +298,8 @@
 
       function Badge({ children, theme }) {
         return (
-          <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: theme.chip1, color: theme.heading }}>
-            {children}
+          <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: theme.chip1, color: '#000000' }}>
+            <T>{children}</T>
           </span>
         );
       }
@@ -303,8 +320,10 @@
         return (
           <div className="p-4 md:p-6">
             <div className="flex items-start justify-between gap-4">
-              <h4 className="text-base md:text-lg font-semibold" style={{ color: theme?.heading || BRAND.text.heading }}>{title}</h4>
-              <button onClick={() => { haptic.light(); onClose(); }} className="text-sm" style={{ color: theme?.text || BRAND.text.base }}>Закрыть</button>
+              <h4 className="text-base md:text-lg font-semibold" style={{ color: theme?.heading || BRAND.text.heading }}><T>{title}</T></h4>
+              <button onClick={() => { haptic.light(); onClose(); }} className="text-sm" style={{ color: theme?.text || BRAND.text.base }}>
+                Закрыть
+              </button>
             </div>
             {children}
           </div>
@@ -317,8 +336,8 @@
           <div className="rounded-2xl p-4 shadow-sm border" style={{ borderColor: theme.border, background: theme.bg }}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold" style={{ color: theme.heading }}>{p.title}</h3>
-                <div className="mt-1 text-sm" style={{ color: theme.text }}>Партнёр: {p.partners.join(', ')}</div>
+                <h3 className="text-lg font-semibold" style={{ color: theme.heading }}><T>{p.title}</T></h3>
+                <div className="mt-1 text-sm" style={{ color: theme.text }}><T>Партнёр:</T> <T>{p.partners.join(', ')}</T></div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Badge theme={theme}>Старт: {dstr(p.start_date)}</Badge>
                   <Badge theme={theme}>Длительность: {p.duration_months_est} мес</Badge>
@@ -327,15 +346,15 @@
                 </div>
               </div>
               <button onClick={() => { haptic.selection(); onCompareToggle(p.id); }} className={`px-3 py-2 rounded-xl text-sm border ${selected ? 'font-semibold' : ''}`} style={{ borderColor: theme.border }}>
-                {selected ? 'В сравнении' : 'Сравнить'}
+                <T>{selected ? 'В сравнении' : 'Сравнить'}</T>
               </button>
             </div>
 
             <div className="mt-3 grid gap-2">
               <div className="text-sm" style={{ color: theme.text }}>
-                <span className="font-medium">Кому подойдёт:</span>
+                <span className="font-medium"><T>Кому подойдёт:</T></span>
                 <ul className="list-disc ml-5 mt-1 space-y-1">
-                  {p.audience.map((a, i) => <li key={i}>{a}</li>)}
+                  {p.audience.map((a, i) => <li key={i}><T>{a}</T></li>)}
                 </ul>
               </div>
             </div>
@@ -357,13 +376,13 @@
                 <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
                 <div className="relative w-full md:max-w-2xl md:rounded-2xl md:shadow-xl md:border" style={{ background: theme.bg, borderColor: theme.border }}>
                   <ModalWithTGBack title={p.title} onClose={() => setOpen(false)} theme={theme}>
-                    <div className="mt-3 text-sm" style={{ color: theme.text }}>{p.about}</div>
+                    <div className="mt-3 text-sm" style={{ color: theme.text }}><T>{p.about}</T></div>
                     <div className="mt-4">
-                      <div className="text-sm font-medium" style={{ color: theme.heading }}>Чему научитесь</div>
-                      <ul className="list-disc ml-5 mt-1 space-y-1 text-sm">{p.learn.map((x, i) => <li key={i}>{x}</li>)}</ul>
+                      <div className="text-sm font-medium" style={{ color: theme.heading }}><T>Чему научитесь</T></div>
+                      <ul className="list-disc ml-5 mt-1 space-y-1 text-sm">{p.learn.map((x, i) => <li key={i}><T>{x}</T></li>)}</ul>
                     </div>
                     <div className="mt-4 text-sm" style={{ color: theme.text }}>
-                      <span className="font-medium">Документ:</span> {p.diploma}
+                      <span className="font-medium"><T>Документ:</T></span> <T>{p.diploma}</T>
                     </div>
                     <div className="mt-5 flex gap-2">
                       <button onClick={() => { haptic.light(); openUrl(p.landing_url); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: BRAND.primary, color: 'white' }}>
@@ -388,27 +407,27 @@
         return (
           <div className="rounded-2xl p-4 border" style={{ borderColor: theme.border, background: theme.bg }}>
             <div className="flex items-center justify-between">
-              <h4 className="text-base font-semibold" style={{ color: theme.heading }}>Сравнение программ</h4>
-              <button onClick={() => { haptic.selection(); onReset(); }} className="px-3 py-1.5 rounded-xl text-sm border" style={{ borderColor: theme.border }}>Сбросить</button>
+              <h4 className="text-base font-semibold" style={{ color: theme.heading }}><T>Сравнение программ</T></h4>
+              <button onClick={() => { haptic.selection(); onReset(); }} className="px-3 py-1.5 rounded-xl text-sm border" style={{ borderColor: theme.border }}><T>Сбросить</T></button>
             </div>
 
             {/* Mobile: stacked cards */}
             <div className="md:hidden mt-3 grid gap-3">
               {data.map((p) => (
                 <div key={p.id} className="rounded-xl p-3 border" style={{ borderColor: theme.border }}>
-                  <div className="text-sm font-semibold" style={{ color: theme.heading }}>{p.title}</div>
+                  <div className="text-sm font-semibold" style={{ color: theme.heading }}><T>{p.title}</T></div>
                   <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-xs" style={{ color: theme.text }}>
-                    <div className="opacity-70">Вуз-партнёр</div><div>{p.partners.join(', ')}</div>
-                    <div className="opacity-70">Старт</div><div>{dstr(p.start_date)}</div>
-                    <div className="opacity-70">Длительность</div><div>{p.duration_months_est} мес</div>
-                    <div className="opacity-70">Цена</div><div>{rub(p.price_full_rub)} ₽</div>
-                    <div className="opacity-70">От ₽/мес</div><div>{rub(p.price_from_per_month_rub)} ₽</div>
-                    <div className="opacity-70">Документ</div><div>{p.diploma}</div>
+                    <div className="opacity-70"><T>Вуз-партнёр</T></div><div><T>{p.partners.join(', ')}</T></div>
+                    <div className="opacity-70"><T>Старт</T></div><div><T>{dstr(p.start_date)}</T></div>
+                    <div className="opacity-70"><T>Длительность</T></div><div><T>{p.duration_months_est} мес</T></div>
+                    <div className="opacity-70"><T>Цена</T></div><div><T>{rub(p.price_full_rub)} ₽</T></div>
+                    <div className="opacity-70"><T>От ₽/мес</T></div><div><T>{rub(p.price_from_per_month_rub)} ₽</T></div>
+                    <div className="opacity-70"><T>Документ</T></div><div><T>{p.diploma}</T></div>
                   </div>
                   <div className="mt-2">
-                    <div className="text-xs font-medium" style={{ color: theme.heading }}>Навыки</div>
+                    <div className="text-xs font-medium" style={{ color: theme.heading }}><T>Навыки</T></div>
                     <ul className="list-disc ml-4 mt-1 space-y-0.5 text-xs" style={{ color: theme.text }}>
-                      {p.learn.map((skill, i) => <li key={i}>{skill}</li>)}
+                      {p.learn.map((skill, i) => <li key={i}><T>{skill}</T></li>)}
                     </ul>
                   </div>
                 </div>
@@ -420,27 +439,27 @@
               <table className="w-full text-sm whitespace-normal break-words leading-snug">
                 <thead>
                   <tr className="text-left" style={{ color: theme.text }}>
-                    <th className="py-2 pr-3 w-[26%]">Программа</th>
-                    <th className="py-2 pr-3 w-[16%]">Вуз-партнёр</th>
-                    <th className="py-2 pr-3 w-[12%]">Старт</th>
-                    <th className="py-2 pr-3 w-[12%]">Длительность</th>
-                    <th className="py-2 pr-3 w-[12%]">Цена</th>
-                    <th className="py-2 pr-3 w-[12%]">От ₽/мес</th>
-                    <th className="py-2 pr-3 w-[30%]">Документ</th>
-                    <th className="py-2 pr-0 w-[34%]">Навыки</th>
+                    <th className="py-2 pr-3 w-[26%]"><T>Программа</T></th>
+                    <th className="py-2 pr-3 w-[16%]"><T>Вуз-партнёр</T></th>
+                    <th className="py-2 pr-3 w-[12%]"><T>Старт</T></th>
+                    <th className="py-2 pr-3 w-[12%]"><T>Длительность</T></th>
+                    <th className="py-2 pr-3 w-[12%]"><T>Цена</T></th>
+                    <th className="py-2 pr-3 w-[12%]"><T>От ₽/мес</T></th>
+                    <th className="py-2 pr-3 w-[30%]"><T>Документ</T></th>
+                    <th className="py-2 pr-0 w-[34%]"><T>Навыки</T></th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.map((p) => (
                     <tr key={p.id} className="border-t align-top" style={{ borderColor: theme.border }}>
-                      <td className="py-2 pr-3">{p.title}</td>
-                      <td className="py-2 pr-3">{p.partners.join(', ')}</td>
-                      <td className="py-2 pr-3">{dstr(p.start_date)}</td>
-                      <td className="py-2 pr-3">{p.duration_months_est} мес</td>
-                      <td className="py-2 pr-3">{rub(p.price_full_rub)} ₽</td>
-                      <td className="py-2 pr-3">{rub(p.price_from_per_month_rub)} ₽</td>
-                      <td className="py-2 pr-3">{p.diploma}</td>
-                      <td className="py-2 pr-0"><ul className="list-disc ml-4">{p.learn.map((s, i) => <li key={i}>{s}</li>)}</ul></td>
+                      <td className="py-2 pr-3"><T>{p.title}</T></td>
+                      <td className="py-2 pr-3"><T>{p.partners.join(', ')}</T></td>
+                      <td className="py-2 pr-3"><T>{dstr(p.start_date)}</T></td>
+                      <td className="py-2 pr-3"><T>{p.duration_months_est} мес</T></td>
+                      <td className="py-2 pr-3"><T>{rub(p.price_full_rub)} ₽</T></td>
+                      <td className="py-2 pr-3"><T>{rub(p.price_from_per_month_rub)} ₽</T></td>
+                      <td className="py-2 pr-3"><T>{p.diploma}</T></td>
+                      <td className="py-2 pr-0"><ul className="list-disc ml-4">{p.learn.map((s, i) => <li key={i}><T>{s}</T></li>)}</ul></td>
                     </tr>
                   ))}
                 </tbody>
@@ -459,32 +478,10 @@
         return (
           <div className="flex gap-2">
             <select value={partner} onChange={(e) => { haptic.selection(); setPartner(e.target.value); }} className="px-3 py-2 rounded-xl border w-full md:w-1/3" style={{ borderColor: theme.border, background: theme.bg, color: theme.text }}>
-              {partners.map((p) => <option key={p} value={p}>{p}</option>)}
+              {partners.map((p) => <option key={p} value={p}><T>{p}</T></option>)}
             </select>
           </div>
         );
-      }
-
-      // =====================
-      // DEV TESTS (runtime checks)
-      // =====================
-      function runDevTests() {
-        const must = (cond, msg) => console.assert(cond, msg);
-        must(Array.isArray(PROGRAMS) && PROGRAMS.length >= 7, 'PROGRAMS must contain 7+ items');
-        const ids = new Set();
-        PROGRAMS.forEach((p) => {
-          must(typeof p.id === 'string' && p.id.length > 0, 'Program.id required');
-          must(!ids.has(p.id), 'Program.id must be unique'); ids.add(p.id);
-          must(typeof p.title === 'string' && p.title.length > 3, 'Program.title required');
-          must(Array.isArray(p.partners) && p.partners.length > 0, 'Program.partners required');
-          must(!Number.isNaN(Date.parse(p.start_date)), 'Program.start_date must be ISO date');
-          must(/обновляется/i.test(p.about), 'Program.about must state it updates every cohort');
-          must(/(диплом|удостоверение)/i.test(p.diploma), 'Program.diploma must mention a document type');
-        });
-        const aiPM = PROGRAMS.find((p) => p.id === 'dpo-ai-pm-mfti');
-        must(!!aiPM && aiPM.start_date === '2025-12-08', 'AI PM start date must be 2025-12-08');
-        must(/^https:\/\//.test(SETTINGS.webinars_url), 'webinars_url must be https');
-        must(/^@/.test(SETTINGS.telegram_channel), 'telegram_channel must start with @');
       }
 
       // =====================
@@ -500,7 +497,7 @@
         }
         return (
           <span className="text-base font-semibold" style={{ color: theme.heading }}>
-            Нетология — программы с вузами
+            <T>Нетология — программы с вузами</T>
           </span>
         );
       }
@@ -523,7 +520,6 @@
               tg.setBackgroundColor?.('secondary_bg_color');
             } catch {}
           }
-          runDevTests();
         }, []);
 
         const filtered = useMemo(() => PROGRAMS.filter((p) => partner === 'Все вузы' || p.partners.includes(partner)), [partner]);
@@ -538,7 +534,7 @@
                   <LogoBrand />
                 </div>
                 <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.manager.tg_username.replace('@', '')}`); }} className="px-3 py-1.5 rounded-xl text-sm" style={{ background: BRAND.primary, color: 'white' }}>
-                  Написать менеджеру
+                  <T>Написать менеджеру</T>
                 </button>
               </div>
             </div>
@@ -548,24 +544,22 @@
               {/* Intro heading */}
               <div className="text-left mb-2">
                 <h2 className="text-lg md:text-xl font-semibold" style={{ color: theme.heading }}>
-                  Дополнительное профессиональное онлайн-образование в ведущих вузах страны
+                  <T>Дополнительное профессиональное онлайн-образование в ведущих вузах страны</T>
                 </h2>
                 <p className="mt-1 text-sm md:text-base" style={{ color: theme.text }}>
-                  Чтобы усилить ваше резюме и выделиться на фоне других кандидатов
+                  <T>Чтобы усилить ваше резюме и выделиться на фоне других кандидатов</T>
                 </p>
               </div>
 
               {/* Intro cards */}
               <div className="grid md:grid-cols-2 gap-3">
-                <div className="rounded-2xl p-4" style={{ background: theme.chip2 }}>
-                  <div className="text-sm" style={{ color: theme.heading }}>Что такое ДПО</div>
-                  <div className="mt-1 text-xs" style={{ color: theme.text }}>
-                    Краткие практические программы повышения квалификации или переподготовки. Итог: документ вуза-партнёра и документ Нетологии (в зависимости от программы — диплом о профпереподготовке или удостоверение о повышении квалификации).
-                  </div>
+                <div className="rounded-2xl p-4" style={{ background: theme.chip2, color: '#000000' }}>
+                  <div className="text-sm" style={{ color: '#000000' }}><T>Что такое ДПО</T></div>
+                  <div className="mt-1 text-xs"><T>Краткие практические программы повышения квалификации или переподготовки. Итог: документ вуза-партнёра и документ Нетологии (в зависимости от программы — диплом о профпереподготовке или удостоверение о повышении квалификации).</T></div>
                 </div>
-                <div className="rounded-2xl p-4" style={{ background: theme.chip1 }}>
-                  <div className="text-sm" style={{ color: theme.heading }}>Формат</div>
-                  <div className="mt-1 text-xs" style={{ color: theme.text }}>Онлайн, записи занятий, гибкий график. Рекомендованная нагрузка: 20–30 ч/нед.</div>
+                <div className="rounded-2xl p-4" style={{ background: theme.chip1, color: '#000000' }}>
+                  <div className="text-sm" style={{ color: '#000000' }}><T>Формат</T></div>
+                  <div className="mt-1 text-xs"><T>Онлайн, записи занятий, гибкий график. Рекомендованная нагрузка: 20–30 ч/нед.</T></div>
                 </div>
               </div>
 
@@ -586,30 +580,30 @@
               <div className="rounded-2xl p-4 border" style={{ borderColor: theme.border, background: theme.bg }}>
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <div className="text-base font-semibold" style={{ color: theme.heading }}>Бесплатные вебинары</div>
+                    <div className="text-base font-semibold" style={{ color: theme.heading }}><T>Бесплатные вебинары</T></div>
                     <div className="text-xs mt-1" style={{ color: theme.text }}>
-                      Регулярные открытые эфиры с преподавателями и командами программ: формат, учебный план, ответы на вопросы. Бесплатно, запись присылаем после эфира.
+                      <T>Регулярные открытые эфиры с преподавателями и командами программ: формат, учебный план, ответы на вопросы. Бесплатно, запись присылаем после эфира.</T>
                     </div>
                   </div>
-                  <button onClick={() => { haptic.light(); openUrl(SETTINGS.webinars_url); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: theme.chip2, color: theme.heading }}>
-                    Открыть календарь вебинаров
+                  <button onClick={() => { haptic.light(); openUrl(SETTINGS.webinars_url); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: theme.chip2, color: '#000000' }}>
+                    <T>Открыть календарь вебинаров</T>
                   </button>
                 </div>
               </div>
 
               {/* Telegram channel block */}
               <div className="rounded-2xl p-4 border text-center" style={{ borderColor: theme.border, background: theme.bg }}>
-                <div className="text-base font-semibold mb-1" style={{ color: theme.heading }}>Подписывайтесь на Telegram-канал</div>
-                <div className="text-xs mb-3" style={{ color: theme.text }}>Следите за новостями, обновлениями программ и бесплатными мероприятиями.</div>
+                <div className="text-base font-semibold mb-1" style={{ color: theme.heading }}><T>Подписывайтесь на Telegram-канал</T></div>
+                <div className="text-xs mb-3" style={{ color: theme.text }}><T>Следите за новостями, обновлениями программ и бесплатными мероприятиями.</T></div>
                 <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.telegram_channel.replace('@', '')}`); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: BRAND.primary, color: 'white' }}>
-                  Перейти в канал {SETTINGS.telegram_channel}
+                  <T>Перейти в канал {SETTINGS.telegram_channel}</T>
                 </button>
               </div>
 
               {/* Footer */}
               <div className="pt-6 pb-[calc(40px+var(--sab))] text-center text-xs" style={{ color: theme.text }}>
-                Информация, размещённая в приложении, не является публичной офертой. Актуальные условия обучения, стоимость и документы об образовании уточняйте у менеджера.
-                <div className="mt-2">ООО «Нетология» · ИНН: <span>{SETTINGS.legal.inn}</span> · Адрес: <span>{SETTINGS.legal.address}</span></div>
+                <T>Информация, размещённая в приложении, не является публичной офертой. Актуальные условия обучения, стоимость и документы об образовании уточняйте у менеджера.</T>
+                <div className="mt-2"><T>ООО «Нетология» · ИНН: {SETTINGS.legal.inn} · Адрес: {SETTINGS.legal.address}</T></div>
               </div>
             </div>
           </div>

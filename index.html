@@ -1,41 +1,42 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
   <head>
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
-    />
-    <title>Нетология — программы с вузами</title>
-    <!-- Tailwind CDN (ok for MVP) -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Нетология ДПО — Telegram Mini‑app</title>
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Tailwind (CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React + ReactDOM UMD -->
+    <!-- React 18 UMD -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel Standalone to transpile JSX in browser (MVP only) -->
+    <!-- Babel for in-browser JSX transform (dev/proto only) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Telegram Mini App SDK comes from in-app environment (window.Telegram.WebApp) -->
-    <meta name="theme-color" content="#ffffff" />
     <style>
-      html, body, #root { height: 100%; }
-      body { background: #F5F5F5; }
+      /* iOS safe area helper for footer padding when not using env() everywhere */
+      :root { --sab: env(safe-area-inset-bottom); }
     </style>
   </head>
-  <body>
+  <body class="min-h-screen bg-white">
     <div id="root"></div>
 
     <script type="text/babel">
-      const { useMemo, useState, useEffect } = React;
+      const { useEffect, useMemo, useState } = React;
 
-      // BRAND
+      // =====================
+      // BRAND (Netology look)
+      // =====================
       const BRAND = {
         primary: "#f35b51",
         text: { base: "#323232", heading: "#000000" },
         accent: { info: "#00D2FF", success: "#74A333", danger: "#C52524" },
-        neutral: { border: "#CCCCCC", bgCard1: "#F5F5F5", bgCard2: "#D4E4FB", bgCard3: "#D4F6EC" }
+        neutral: { border: "#CCCCCC", bgCard1: "#F5F5F5", bgCard2: "#D4E4FB", bgCard3: "#D4F6EC" },
       };
 
-      // SETTINGS
+      // =====================
+      // SETTINGS (runtime-configurable)
+      // =====================
       const SETTINGS = {
         manager: { tg_username: "@netology_vo" },
         webinars_url: "https://netology.ru/free/degree",
@@ -44,76 +45,249 @@
           inn: "7726464125",
           address: "117105, Россия, г. Москва, ш. Варшавское, д. 1, стр. 6, помещ. 2/3",
         },
+        // logo: use ONE of the following (or leave both empty for text fallback)
+        logoSrc: "", // URL or data URI (e.g. "data:image/svg+xml;utf8,<svg ...>")
+        logoSvg: "", // raw SVG markup string (starts with <svg ...>)
       };
 
-      // Telegram helpers
-      const getTG = () => (typeof window !== "undefined" ? window?.Telegram?.WebApp : undefined);
+      // =====================
+      // Telegram helpers (WebApp compliance)
+      // =====================
+      const getTG = () => (typeof window !== 'undefined' ? window?.Telegram?.WebApp : undefined);
       const openUrl = (url) => {
         const tg = getTG();
         if (tg?.openLink) tg.openLink(url, { try_instant_view: false });
-        else window.open(url, "_blank", "noopener,noreferrer");
+        else window.open(url, '_blank', 'noopener,noreferrer');
       };
       const openTelegram = (url) => {
         const tg = getTG();
         if (tg?.openTelegramLink) tg.openTelegramLink(url);
-        else window.open(url, "_blank", "noopener,noreferrer");
+        else window.open(url, '_blank', 'noopener,noreferrer');
       };
 
       // Haptics
       const haptic = {
-        light: () => getTG()?.HapticFeedback?.impactOccurred?.("light"),
+        light: () => getTG()?.HapticFeedback?.impactOccurred?.('light'),
         selection: () => getTG()?.HapticFeedback?.selectionChanged?.(),
-        success: () => getTG()?.HapticFeedback?.notificationOccurred?.("success"),
+        success: () => getTG()?.HapticFeedback?.notificationOccurred?.('success'),
       };
 
-      // Auto theme
+      // Auto-theme (reads Telegram themeParams with fallbacks to BRAND)
       function getThemeFromTG() {
         const p = getTG()?.themeParams || {};
         return {
-          bg: p.bg_color || "#FFFFFF",
+          bg: p.bg_color || '#FFFFFF',
           bgSecondary: p.secondary_bg_color || BRAND.neutral.bgCard1,
           text: p.text_color || BRAND.text.base,
           heading: p.text_color || BRAND.text.heading,
-          hint: p.hint_color || "#6b6b6b",
+          hint: p.hint_color || '#6b6b6b',
           link: p.link_color || BRAND.primary,
           border: p.section_separator_color || BRAND.neutral.border,
           button: BRAND.primary,
-          buttonText: p.button_text_color || "#FFFFFF",
+          buttonText: p.button_text_color || '#FFFFFF',
           chip1: BRAND.neutral.bgCard2,
           chip2: BRAND.neutral.bgCard3,
         };
       }
+
       function useTelegramTheme() {
         const [theme, setTheme] = useState(getThemeFromTG());
         useEffect(() => {
           const tg = getTG();
           if (!tg) return;
           const onChange = () => setTheme(getThemeFromTG());
-          tg.onEvent?.("themeChanged", onChange);
-          return () => tg.offEvent?.("themeChanged", onChange);
+          tg.onEvent?.('themeChanged', onChange);
+          return () => tg.offEvent?.('themeChanged', onChange);
         }, []);
         return theme;
       }
 
-      // DATA
+      // =====================
+      // DATA — Programs
+      // =====================
       const PROGRAMS = [
-        { id: "dpo-lead-future", title: "Руководитель будущего: адаптация к новым технологиям и управление результатами", partners: ["РЭУ им. Г.В. Плеханова"], start_date: "2025-11-10", duration_months_est: 5, price_full_rub: 219600, price_from_per_month_rub: 9630, landing_url: "https://netology.ru/programs/upravlenie-rezultatami", audience: ["Руководителям и тимлидам, которые хотят выстроить управление по результатам","Специалистам, растущим в менеджеры и лиды","Предпринимателям, внедряющим data-driven практики"], diploma: "Два диплома о профессиональной переподготовке: РЭУ им. Г.В. Плеханова и Нетологии", learn: ["Метрики, KPI, OKR и управление по результатам","Инструменты адаптации к ИИ и новым технологиям","Коммуникация и проектное управление в условиях изменений"], about:"Программа для лидеров, которым нужно масштабировать результат и встроить новые технологии в ежедневные процессы. Программа обновляется каждый набор и даёт самые актуальные знания.", },
-        { id: "dpo-product-marketing", title: "Стратегии развития продукта: управление продажами и клиентским опытом", partners: ["РАНХиГС"], start_date: "2025-11-05", duration_months_est: 5, price_full_rub: 368100, price_from_per_month_rub: 16145, landing_url: "https://netology.ru/programs/strategii-razvitiya-produkta", audience: ["Руководителям и собственникам, кто отвечает за рост продукта","Продакт-менеджерам и маркетологам, которым нужны фреймворки PMM","Тем, кто строит стратегию и управляет клиентским опытом"], diploma: "Диплом о профессиональной переподготовке Нетологии и удостоверение о повышении квалификации РАНХиГС", learn: ["Стратегия продукта и управление воронкой продаж","Сегментация, JTBD и Customer Journey","Юнит-экономика и product analytics"], about:"Фокус на стратегии и росте: выстраиваем системный product-подход от исследований до монетизации. Программа обновляется каждый набор и даёт самые актуальные знания.", },
-        { id: "dpo-python-mfti", title: "Python: от кода к стартапу", partners: ["МФТИ"], start_date: "2025-10-20", duration_months_est: 7, price_full_rub: 158400, price_from_per_month_rub: 6947, landing_url: "https://netology.ru/programs/razrabotchik-na-python-s-mfti", audience: ["Новичкам, которые хотят войти в разработку на Python","Аналитикам и инженерам, автоматизирующим задачи и скрипты","Специалистам смежных областей (QA, DevOps, BI), кто усиливает навыки кодинга"], diploma: "Два диплома о профессиональной переподготовке: МФТИ и Нетологии", learn: ["Основы Python, ООП, работа с API и БД","Web-разработка/скрипты/боты, деплой","От идеи до MVP: проект и питч-документация"], about:"Путь от базового коду до работающего прототипа: соберёте свой проект и научитесь презентовать результат. Программа обновляется каждый набор и даёт самые актуальные знания.", },
-        { id: "dpo-ai-pm-mfti", title: "Руководитель проектов в области ИИ", partners: ["МФТИ"], start_date: "2025-12-08", duration_months_est: 3, price_full_rub: 114700, price_from_per_month_rub: 5031, landing_url: "https://netology.ru/programs/rukovoditel-proektов-в-oblasti-iskusstvennogo-intellekta-dpo-mfti".replace("ов-в","ov-v"), audience: ["Менеджерам и продактам, запускающим AI-инициативы","Руководителям в бизнесе и госсекторе, внедряющим ИИ в процессы","Тем, кто координирует команды ML/DS/интеграции"], diploma: "Два удостоверения о повышении квалификации: МФТИ и Нетологии", learn: ["Цикл AI-проекта: бизнес-цель → данные → модель → внедрение","Оценка эффекта, рисков и соответствия","Коммуникация между бизнесом и ML-командой"], about:"Системный менеджмент AI-проектов: от постановки задачи до внедрения в контур компании. Программа обновляется каждый набор и даёт самые актуальные знания.", },
-        { id: "dpo-analyst-mfti", title: "Аналитик данных", partners: ["МФТИ"], start_date: "2025-10-20", duration_months_est: 10, price_full_rub: 200250, price_from_per_month_rub: 8343, landing_url: "https://netology.ru/programs/professiya-analitik-dannyh-mfti", audience: ["Тем, кто любит цифры и хочет развиваться на стыке IT и бизнеса","Новичкам, которые хотят получить профессию в аналитике","Практикам, кому нужны инструменты аналитики для более сложных задач","Тем, кто уже работает с данными и планирует смену траектории"], diploma: "Два диплома о профессиональной переподготовке: МФТИ и Нетологии", learn: ["SQL, Python для аналитики, визуализация","AB-тесты, статистика и продуктовые метрики","Дашборды и презентация инсайтов"], about:"Освоите инструменты аналитика и соберёте портфолио из практических кейсов. Программа обновляется каждый набор и даёт самые актуальные знания.", },
-        { id: "dpo-pm-it-ranhigs", title: "Управление проектами и командами в IT", partners: ["РАНХиГС"], start_date: "2025-11-17", duration_months_est: 7, price_full_rub: 200250, price_from_per_month_rub: 8343, landing_url: "https://netology.ru/programs/professiya-menedzher-proektov-v-it-ranhigs", audience: ["Действующим и начинающим проджект-менеджерам в IT","Тимлидам и руководителям, которым нужно прокачать управление командой","Специалистам смежных ролей, переходящим в управление проектами"], diploma: "Диплом о профессиональной переподготовке Нетологии и удостоверение о повышении квалификации РАНХиГС", learn: ["Планирование, риски, бюджет и коммуникации","Agile/Waterfall/гибридные подходы","Управление командой и стейкхолдерами"], about:"Выстроите системное управление проектами и командой на практике. Программа обновляется каждый набор и даёт самые актуальные знания.", },
-        { id: "dpo-devsecops-hse", title: "DevSecOps", partners: ["НИУ ВШЭ"], start_date: "2025-10-27", duration_months_est: 6, price_full_rub: 179600, price_from_per_month_rub: 7875, landing_url: "https://netology.ru/programs/devsecops", audience: ["DevOps/SRE-инженерам, кто интегрирует безопасность на всех этапах SDLC","Backend/Platform инженерам, отвечающим за релизы и инфраструктуру","SEC-специалистам, которым нужно говорить с Dev на одном языке"], diploma: "Два диплома о профессиональной переподготовке: НИУ ВШЭ и Нетологии", learn: ["Практики безопасной разработки и CI/CD","Угрозы, тестирование и мониторинг безопасности","Построение secure-pipeline и культура DevSecOps"], about:"Интегрируете безопасность в процессы DevOps и отработаете инструменты на кейсах. Программа обновляется каждый набор и даёт самые актуальные знания.", },
+        {
+          id: 'dpo-lead-future',
+          title: 'Руководитель будущего: адаптация к новым технологиям и управление результатами',
+          partners: ['РЭУ им. Г.В. Плеханова'],
+          start_date: '2025-11-10',
+          duration_months_est: 5,
+          price_full_rub: 219600,
+          price_from_per_month_rub: 9630,
+          landing_url: 'https://netology.ru/programs/upravlenie-rezultatami',
+          audience: [
+            'Руководителям и тимлидам, которые хотят выстроить управление по результатам',
+            'Специалистам, растущим в менеджеры и лиды',
+            'Предпринимателям, внедряющим data-driven практики',
+          ],
+          diploma: 'Два диплома о профессиональной переподготовке: РЭУ им. Г.В. Плеханова и Нетологии',
+          learn: [
+            'Метрики, KPI, OKR и управление по результатам',
+            'Инструменты адаптации к ИИ и новым технологиям',
+            'Коммуникация и проектное управление в условиях изменений',
+          ],
+          about:
+            'Программа для лидеров, которым нужно масштабировать результат и встроить новые технологии в ежедневные процессы. Программа обновляется каждый набор и даёт самые актуальные знания.',
+        },
+        {
+          id: 'dpo-product-marketing',
+          title: 'Стратегии развития продукта: управление продажами и клиентским опытом',
+          partners: ['РАНХиГС'],
+          start_date: '2025-11-05',
+          duration_months_est: 5,
+          price_full_rub: 368100,
+          price_from_per_month_rub: 16145,
+          landing_url: 'https://netology.ru/programs/strategii-razvitiya-produkta',
+          audience: [
+            'Руководителям и собственникам, кто отвечает за рост продукта',
+            'Продакт-менеджерам и маркетологам, которым нужны фреймворки PMM',
+            'Тем, кто строит стратегию и управляет клиентским опытом',
+          ],
+          diploma:
+            'Диплом о профессиональной переподготовке Нетологии и удостоверение о повышении квалификации РАНХиГС',
+          learn: [
+            'Стратегия продукта и управление воронкой продаж',
+            'Сегментация, JTBD и Customer Journey',
+            'Юнит-экономика и product analytics',
+          ],
+          about:
+            'Фокус на стратегии и росте: выстраиваем системный product-подход от исследований до монетизации. Программа обновляется каждый набор и даёт самые актуальные знания.',
+        },
+        {
+          id: 'dpo-python-mfti',
+          title: 'Python: от кода к стартапу',
+          partners: ['МФТИ'],
+          start_date: '2025-10-20',
+          duration_months_est: 7,
+          price_full_rub: 158400,
+          price_from_per_month_rub: 6947,
+          landing_url: 'https://netology.ru/programs/razrabotchik-na-python-s-mfti',
+          audience: [
+            'Новичкам, которые хотят войти в разработку на Python',
+            'Аналитикам и инженерам, автоматизирующим задачи и скрипты',
+            'Специалистам смежных областей (QA, DevOps, BI), кто усиливает навыки кодинга',
+          ],
+          diploma: 'Два диплома о профессиональной переподготовке: МФТИ и Нетологии',
+          learn: [
+            'Основы Python, ООП, работа с API и БД',
+            'Web-разработка/скрипты/боты, деплой',
+            'От идеи до MVP: проект и питч-документация',
+          ],
+          about:
+            'Путь от базового коду до работающего прототипа: соберёте свой проект и научитесь презентовать результат. Программа обновляется каждый набор и даёт самые актуальные знания.',
+        },
+        {
+          id: 'dpo-ai-pm-mfti',
+          title: 'Руководитель проектов в области ИИ',
+          partners: ['МФТИ'],
+          start_date: '2025-12-08',
+          duration_months_est: 3,
+          price_full_rub: 114700,
+          price_from_per_month_rub: 5031,
+          landing_url:
+            'https://netology.ru/programs/rukovoditel-proektov-v-oblasti-iskusstvennogo-intellekta-dpo-mfti',
+          audience: [
+            'Менеджерам и продактам, запускающим AI-инициативы',
+            'Руководителям в бизнесе и госсекторе, внедряющим ИИ в процессы',
+            'Тем, кто координирует команды ML/DS/интеграции',
+          ],
+          diploma: 'Два удостоверения о повышении квалификации: МФТИ и Нетологии',
+          learn: [
+            'Цикл AI-проекта: бизнес-цель → данные → модель → внедрение',
+            'Оценка эффекта, рисков и соответствия',
+            'Коммуникация между бизнесом и ML-командой',
+          ],
+          about:
+            'Системный менеджмент AI-проектов: от постановки задачи до внедрения в контур компании. Программа обновляется каждый набор и даёт самые актуальные знания.',
+        },
+        {
+          id: 'dpo-analyst-mfti',
+          title: 'Аналитик данных',
+          partners: ['МФТИ'],
+          start_date: '2025-10-20',
+          duration_months_est: 10,
+          price_full_rub: 200250,
+          price_from_per_month_rub: 8343,
+          landing_url: 'https://netology.ru/programs/professiya-analitik-dannyh-mfti',
+          audience: [
+            'Тем, кто любит цифры и хочет развиваться на стыке IT и бизнеса',
+            'Новичкам, которые хотят получить профессию в аналитике',
+            'Практикам, кому нужны инструменты аналитики для более сложных задач',
+            'Тем, кто уже работает с данными и планирует смену траектории',
+          ],
+          diploma: 'Два диплома о профессиональной переподготовке: МФТИ и Нетологии',
+          learn: [
+            'SQL, Python для аналитики, визуализация',
+            'AB-тесты, статистика и продуктовые метрики',
+            'Дашборды и презентация инсайтов',
+          ],
+          about:
+            'Освоите инструменты аналитика и соберёте портфолио из практических кейсов. Программа обновляется каждый набор и даёт самые актуальные знания.',
+        },
+        {
+          id: 'dpo-pm-it-ranhigs',
+          title: 'Управление проектами и командами в IT',
+          partners: ['РАНХиГС'],
+          start_date: '2025-11-17',
+          duration_months_est: 7,
+          price_full_rub: 200250,
+          price_from_per_month_rub: 8343,
+          landing_url: 'https://netology.ru/programs/professiya-menedzher-proektov-v-it-ranhigs',
+          audience: [
+            'Действующим и начинающим проджект-менеджерам в IT',
+            'Тимлидам и руководителям, которым нужно прокачать управление командой',
+            'Специалистам смежных ролей, переходящим в управление проектами',
+          ],
+          diploma:
+            'Диплом о профессиональной переподготовке Нетологии и удостоверение о повышении квалификации РАНХиГС',
+          learn: [
+            'Планирование, риски, бюджет и коммуникации',
+            'Agile/Waterfall/гибридные подходы',
+            'Управление командой и стейкхолдерами',
+          ],
+          about:
+            'Выстроите системное управление проектами и командой на практике. Программа обновляется каждый набор и даёт самые актуальные знания.',
+        },
+        {
+          id: 'dpo-devsecops-hse',
+          title: 'DevSecOps',
+          partners: ['НИУ ВШЭ'],
+          start_date: '2025-10-27',
+          duration_months_est: 6,
+          price_full_rub: 179600,
+          price_from_per_month_rub: 7875,
+          landing_url: 'https://netology.ru/programs/devsecops',
+          audience: [
+            'DevOps/SRE-инженерам, кто интегрирует безопасность на всех этапах SDLC',
+            'Backend/Platform инженерам, отвечающим за релизы и инфраструктуру',
+            'SEC-специалистам, которым нужно говорить с Dev на одном языке',
+          ],
+          diploma: 'Два диплома о профессиональной переподготовке: НИУ ВШЭ и Нетологии',
+          learn: [
+            'Практики безопасной разработки и CI/CD',
+            'Угрозы, тестирование и мониторинг безопасности',
+            'Построение secure-pipeline и культура DevSecOps',
+          ],
+          about:
+            'Интегрируете безопасность в процессы DevOps и отработаете инструменты на кейсах. Программа обновляется каждый набор и даёт самые актуальные знания.',
+        },
       ];
 
+      // =====================
       // Helpers
-      const rub = (n) => new Intl.NumberFormat("ru-RU").format(n);
-      const dstr = (s) => new Date(s).toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
+      // =====================
+      const rub = (n) => new Intl.NumberFormat('ru-RU').format(n);
+      const dstr = (s) => new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
 
       function Badge({ children, theme }) {
-        return <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: theme.chip1, color: theme.heading }}>{children}</span>;
+        return (
+          <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: theme.chip1, color: theme.heading }}>
+            {children}
+          </span>
+        );
       }
 
+      // Modal wrapper integrating Telegram BackButton
       function ModalWithTGBack({ title, onClose, children, theme }) {
         useEffect(() => {
           const tg = getTG();
@@ -121,10 +295,11 @@
           try {
             tg.BackButton.show();
             const handler = () => { haptic.selection?.(); onClose?.(); };
-            tg.onEvent?.("backButtonClicked", handler);
-            return () => { tg.BackButton.hide(); tg.offEvent?.("backButtonClicked", handler); };
+            tg.onEvent?.('backButtonClicked', handler);
+            return () => { tg.BackButton.hide(); tg.offEvent?.('backButtonClicked', handler); };
           } catch {}
         }, [onClose]);
+
         return (
           <div className="p-4 md:p-6">
             <div className="flex items-start justify-between gap-4">
@@ -143,7 +318,7 @@
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold" style={{ color: theme.heading }}>{p.title}</h3>
-                <div className="mt-1 text-sm" style={{ color: theme.text }}>Партнёр: {p.partners.join(", ")}</div>
+                <div className="mt-1 text-sm" style={{ color: theme.text }}>Партнёр: {p.partners.join(', ')}</div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Badge theme={theme}>Старт: {dstr(p.start_date)}</Badge>
                   <Badge theme={theme}>Длительность: {p.duration_months_est} мес</Badge>
@@ -151,26 +326,28 @@
                   <Badge theme={theme}>От {rub(p.price_from_per_month_rub)} ₽/мес</Badge>
                 </div>
               </div>
-              <button onClick={() => { haptic.selection(); onCompareToggle(p.id); }} className={"px-3 py-2 rounded-xl text-sm border " + (selected ? "font-semibold" : "")} style={{ borderColor: theme.border }}>
-                {selected ? "В сравнении" : "Сравнить"}
+              <button onClick={() => { haptic.selection(); onCompareToggle(p.id); }} className={`px-3 py-2 rounded-xl text-sm border ${selected ? 'font-semibold' : ''}`} style={{ borderColor: theme.border }}>
+                {selected ? 'В сравнении' : 'Сравнить'}
               </button>
             </div>
 
             <div className="mt-3 grid gap-2">
               <div className="text-sm" style={{ color: theme.text }}>
                 <span className="font-medium">Кому подойдёт:</span>
-                <ul className="list-disc ml-5 mt-1 space-y-1">{p.audience.map((a, i) => <li key={i}>{a}</li>)}</ul>
+                <ul className="list-disc ml-5 mt-1 space-y-1">
+                  {p.audience.map((a, i) => <li key={i}>{a}</li>)}
+                </ul>
               </div>
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <button onClick={() => { haptic.light(); openUrl(p.landing_url); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: BRAND.primary, color: "white" }}>
+              <button onClick={() => { haptic.light(); openUrl(p.landing_url); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: BRAND.primary, color: 'white' }}>
                 Посмотреть программу
               </button>
               <button onClick={() => { haptic.light(); setOpen(true); }} className="px-4 py-2 rounded-xl text-sm border" style={{ borderColor: theme.border }}>
                 Подробнее
               </button>
-              <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.manager.tg_username.replace("@", "")}`); }} className="px-4 py-2 rounded-xl text-sm border" style={{ borderColor: theme.border }}>
+              <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.manager.tg_username.replace('@', '')}`); }} className="px-4 py-2 rounded-xl text-sm border" style={{ borderColor: theme.border }}>
                 Написать менеджеру
               </button>
             </div>
@@ -189,10 +366,10 @@
                       <span className="font-medium">Документ:</span> {p.diploma}
                     </div>
                     <div className="mt-5 flex gap-2">
-                      <button onClick={() => { haptic.light(); openUrl(p.landing_url); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: BRAND.primary, color: "white" }}>
+                      <button onClick={() => { haptic.light(); openUrl(p.landing_url); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: BRAND.primary, color: 'white' }}>
                         Посмотреть программу
                       </button>
-                      <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.manager.tg_username.replace("@", "")}`); }} className="px-4 py-2 rounded-xl text-sm border" style={{ borderColor: theme.border }}>
+                      <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.manager.tg_username.replace('@', '')}`); }} className="px-4 py-2 rounded-xl text-sm border" style={{ borderColor: theme.border }}>
                         Написать менеджеру
                       </button>
                     </div>
@@ -204,35 +381,7 @@
         );
       }
 
-      function HorizontalScroll({ children, theme, className }) {
-        const [showLeft, setShowLeft] = useState(false);
-        const [showRight, setShowRight] = useState(true);
-        const [showHint, setShowHint] = useState(true);
-        const ref = React.useRef(null);
-
-        const recompute = () => {
-          const el = ref.current;
-          if (!el) return;
-          const { scrollLeft, clientWidth, scrollWidth } = el;
-          setShowLeft(scrollLeft > 2);
-          setShowRight(scrollLeft + clientWidth < scrollWidth - 2);
-        };
-
-        useEffect(() => { recompute(); }, []);
-        const onScroll = () => { if (showHint) setShowHint(false); recompute(); };
-
-        return (
-          <div className={"relative " + (className || "")}>
-            <div ref={ref} onScroll={onScroll} className="overflow-x-auto overflow-y-hidden -mx-2 px-2" style={{ WebkitOverflowScrolling: "touch" }}>
-              {children}
-            </div>
-            {showLeft && (<div className="pointer-events-none absolute inset-y-0 left-0 w-6 md:w-8" style={{ background: `linear-gradient(90deg, ${theme.bg} 0%, ${theme.bg}AA 60%, transparent 100%)` }} />)}
-            {showRight && (<div className="pointer-events-none absolute inset-y-0 right-0 w-6 md:w-8" style={{ background: `linear-gradient(270deg, ${theme.bg} 0%, ${theme.bg}AA 60%, transparent 100%)` }} />)}
-            {showHint && (<div className="md:hidden absolute -top-2 right-3 text-[11px] px-2 py-1 rounded-full" style={{ background: theme.chip1, color: theme.heading, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>Смахните таблицу ↔</div>)}
-          </div>
-        );
-      }
-
+      // Responsive Compare: cards on mobile, table on desktop
       function CompareTable({ ids, onReset, theme }) {
         const data = PROGRAMS.filter((p) => ids.includes(p.id));
         if (data.length === 0) return null;
@@ -240,44 +389,63 @@
           <div className="rounded-2xl p-4 border" style={{ borderColor: theme.border, background: theme.bg }}>
             <div className="flex items-center justify-between">
               <h4 className="text-base font-semibold" style={{ color: theme.heading }}>Сравнение программ</h4>
-              <button onClick={() => { haptic.selection(); onReset(); }} className="px-3 py-1.5 rounded-xl text-sm border" style={{ borderColor: theme.border }}>
-                Сбросить
-              </button>
+              <button onClick={() => { haptic.selection(); onReset(); }} className="px-3 py-1.5 rounded-xl text-sm border" style={{ borderColor: theme.border }}>Сбросить</button>
             </div>
-            <HorizontalScroll theme={theme} className="mt-2">
-              <table className="text-sm whitespace-nowrap" style={{ minWidth: 1040 }}>
+
+            {/* Mobile: stacked cards */}
+            <div className="md:hidden mt-3 grid gap-3">
+              {data.map((p) => (
+                <div key={p.id} className="rounded-xl p-3 border" style={{ borderColor: theme.border }}>
+                  <div className="text-sm font-semibold" style={{ color: theme.heading }}>{p.title}</div>
+                  <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-xs" style={{ color: theme.text }}>
+                    <div className="opacity-70">Вуз-партнёр</div><div>{p.partners.join(', ')}</div>
+                    <div className="opacity-70">Старт</div><div>{dstr(p.start_date)}</div>
+                    <div className="opacity-70">Длительность</div><div>{p.duration_months_est} мес</div>
+                    <div className="opacity-70">Цена</div><div>{rub(p.price_full_rub)} ₽</div>
+                    <div className="opacity-70">От ₽/мес</div><div>{rub(p.price_from_per_month_rub)} ₽</div>
+                    <div className="opacity-70">Документ</div><div>{p.diploma}</div>
+                  </div>
+                  <div className="mt-2">
+                    <div className="text-xs font-medium" style={{ color: theme.heading }}>Навыки</div>
+                    <ul className="list-disc ml-4 mt-1 space-y-0.5 text-xs" style={{ color: theme.text }}>
+                      {p.learn.map((skill, i) => <li key={i}>{skill}</li>)}
+                    </ul>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="hidden md:block mt-2">
+              <table className="w-full text-sm whitespace-normal break-words leading-snug">
                 <thead>
                   <tr className="text-left" style={{ color: theme.text }}>
-                    <th className="py-2 pr-4" style={{ width: 260 }}>Программа</th>
-                    <th className="py-2 pr-4" style={{ width: 160 }}>Вуз-партнёр</th>
-                    <th className="py-2 pr-4" style={{ width: 130 }}>Старт</th>
-                    <th className="py-2 pr-4" style={{ width: 130 }}>Длительность</th>
-                    <th className="py-2 pr-4" style={{ width: 120 }}>Цена</th>
-                    <th className="py-2 pr-4" style={{ width: 120 }}>От ₽/мес</th>
-                    <th className="py-2 pr-4" style={{ width: 280 }}>Документ</th>
-                    <th className="py-2 pr-4" style={{ width: 320 }}>Навыки</th>
+                    <th className="py-2 pr-3 w-[26%]">Программа</th>
+                    <th className="py-2 pr-3 w-[16%]">Вуз-партнёр</th>
+                    <th className="py-2 pr-3 w-[12%]">Старт</th>
+                    <th className="py-2 pr-3 w-[12%]">Длительность</th>
+                    <th className="py-2 pr-3 w-[12%]">Цена</th>
+                    <th className="py-2 pr-3 w-[12%]">От ₽/мес</th>
+                    <th className="py-2 pr-3 w-[30%]">Документ</th>
+                    <th className="py-2 pr-0 w-[34%]">Навыки</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.map((p) => (
-                    <tr key={p.id} className="border-t" style={{ borderColor: theme.border }}>
-                      <td className="py-2 pr-4" style={{ maxWidth: 280 }}>{p.title}</td>
-                      <td className="py-2 pr-4">{p.partners.join(", ")}</td>
-                      <td className="py-2 pr-4">{dstr(p.start_date)}</td>
-                      <td className="py-2 pr-4">{p.duration_months_est} мес</td>
-                      <td className="py-2 pr-4">{rub(p.price_full_rub)} ₽</td>
-                      <td className="py-2 pr-4">{rub(p.price_from_per_month_rub)} ₽</td>
-                      <td className="py-2 pr-4" style={{ maxWidth: 320 }}>{p.diploma}</td>
-                      <td className="py-2 pr-4" style={{ maxWidth: 360 }}>
-                        <ul className="list-disc ml-4">
-                          {p.learn.map((skill, i) => <li key={i}>{skill}</li>)}
-                        </ul>
-                      </td>
+                    <tr key={p.id} className="border-t align-top" style={{ borderColor: theme.border }}>
+                      <td className="py-2 pr-3">{p.title}</td>
+                      <td className="py-2 pr-3">{p.partners.join(', ')}</td>
+                      <td className="py-2 pr-3">{dstr(p.start_date)}</td>
+                      <td className="py-2 pr-3">{p.duration_months_est} мес</td>
+                      <td className="py-2 pr-3">{rub(p.price_full_rub)} ₽</td>
+                      <td className="py-2 pr-3">{rub(p.price_from_per_month_rub)} ₽</td>
+                      <td className="py-2 pr-3">{p.diploma}</td>
+                      <td className="py-2 pr-0"><ul className="list-disc ml-4">{p.learn.map((s, i) => <li key={i}>{s}</li>)}</ul></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </HorizontalScroll>
+            </div>
           </div>
         );
       }
@@ -286,7 +454,7 @@
         const partners = useMemo(() => {
           const set = new Set();
           PROGRAMS.forEach((p) => p.partners.forEach((x) => set.add(x)));
-          return ["Все вузы", ...Array.from(set)];
+          return ['Все вузы', ...Array.from(set)];
         }, []);
         return (
           <div className="flex gap-2">
@@ -297,8 +465,51 @@
         );
       }
 
+      // =====================
+      // DEV TESTS (runtime checks)
+      // =====================
+      function runDevTests() {
+        const must = (cond, msg) => console.assert(cond, msg);
+        must(Array.isArray(PROGRAMS) && PROGRAMS.length >= 7, 'PROGRAMS must contain 7+ items');
+        const ids = new Set();
+        PROGRAMS.forEach((p) => {
+          must(typeof p.id === 'string' && p.id.length > 0, 'Program.id required');
+          must(!ids.has(p.id), 'Program.id must be unique'); ids.add(p.id);
+          must(typeof p.title === 'string' && p.title.length > 3, 'Program.title required');
+          must(Array.isArray(p.partners) && p.partners.length > 0, 'Program.partners required');
+          must(!Number.isNaN(Date.parse(p.start_date)), 'Program.start_date must be ISO date');
+          must(/обновляется/i.test(p.about), 'Program.about must state it updates every cohort');
+          must(/(диплом|удостоверение)/i.test(p.diploma), 'Program.diploma must mention a document type');
+        });
+        const aiPM = PROGRAMS.find((p) => p.id === 'dpo-ai-pm-mfti');
+        must(!!aiPM && aiPM.start_date === '2025-12-08', 'AI PM start date must be 2025-12-08');
+        must(/^https:\/\//.test(SETTINGS.webinars_url), 'webinars_url must be https');
+        must(/^@/.test(SETTINGS.telegram_channel), 'telegram_channel must start with @');
+      }
+
+      // =====================
+      // Topbar Logo component (no asset imports)
+      // =====================
+      function LogoBrand() {
+        const theme = useTelegramTheme();
+        if (SETTINGS.logoSvg && /^\s*<svg[\s\S]*<\/svg>\s*$/.test(SETTINGS.logoSvg)) {
+          return <span className="h-6 inline-flex items-center" dangerouslySetInnerHTML={{ __html: SETTINGS.logoSvg }} />;
+        }
+        if (SETTINGS.logoSrc) {
+          return <img src={SETTINGS.logoSrc} alt="Нетология" className="h-6" />;
+        }
+        return (
+          <span className="text-base font-semibold" style={{ color: theme.heading }}>
+            Нетология — программы с вузами
+          </span>
+        );
+      }
+
+      // =====================
+      // APP (root component)
+      // =====================
       function App() {
-        const [partner, setPartner] = useState("Все вузы");
+        const [partner, setPartner] = useState('Все вузы');
         const [compareIds, setCompareIds] = useState([]);
         const theme = useTelegramTheme();
 
@@ -308,34 +519,43 @@
             try {
               tg.ready();
               tg.expand?.();
-              tg.setHeaderColor?.("bg_color");
-              tg.setBackgroundColor?.("secondary_bg_color");
+              tg.setHeaderColor?.('bg_color');
+              tg.setBackgroundColor?.('secondary_bg_color');
             } catch {}
           }
-          // light tests
-          console.assert(Array.isArray(PROGRAMS) && PROGRAMS.length >= 7, "PROGRAMS length");
+          runDevTests();
         }, []);
 
-        const filtered = useMemo(() => PROGRAMS.filter((p) => partner === "Все вузы" || p.partners.includes(partner)), [partner]);
+        const filtered = useMemo(() => PROGRAMS.filter((p) => partner === 'Все вузы' || p.partners.includes(partner)), [partner]);
         const toggleCompare = (id) => setCompareIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id].slice(-3)));
 
         return (
           <div className="min-h-screen" style={{ background: theme.bgSecondary, color: theme.text }}>
+            {/* TOP BAR */}
             <div className="sticky top-0 z-10" style={{ background: theme.bg, borderBottom: `1px solid ${theme.border}` }}>
               <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ background: BRAND.primary }} />
-                  <h1 className="text-base font-semibold" style={{ color: theme.heading }}>
-                    Нетология — программы с вузами
-                  </h1>
+                  <LogoBrand />
                 </div>
-                <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.manager.tg_username.replace("@", "")}`); }} className="px-3 py-1.5 rounded-xl text-sm" style={{ background: BRAND.primary, color: "white" }}>
+                <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.manager.tg_username.replace('@', '')}`); }} className="px-3 py-1.5 rounded-xl text-sm" style={{ background: BRAND.primary, color: 'white' }}>
                   Написать менеджеру
                 </button>
               </div>
             </div>
 
+            {/* CONTENT */}
             <div className="max-w-5xl mx-auto px-4 py-4 grid gap-4">
+              {/* Intro heading */}
+              <div className="text-left mb-2">
+                <h2 className="text-lg md:text-xl font-semibold" style={{ color: theme.heading }}>
+                  Дополнительное профессиональное онлайн-образование в ведущих вузах страны
+                </h2>
+                <p className="mt-1 text-sm md:text-base" style={{ color: theme.text }}>
+                  Чтобы усилить ваше резюме и выделиться на фоне других кандидатов
+                </p>
+              </div>
+
+              {/* Intro cards */}
               <div className="grid md:grid-cols-2 gap-3">
                 <div className="rounded-2xl p-4" style={{ background: theme.chip2 }}>
                   <div className="text-sm" style={{ color: theme.heading }}>Что такое ДПО</div>
@@ -349,20 +569,27 @@
                 </div>
               </div>
 
+              {/* Filters */}
               <Filters partner={partner} setPartner={setPartner} theme={theme} />
+
+              {/* Compare table */}
               <CompareTable ids={compareIds} onReset={() => setCompareIds([])} theme={theme} />
 
+              {/* Programs list */}
               <div className="grid gap-3">
-                {PROGRAMS.filter((p) => partner === "Все вузы" || p.partners.includes(partner)).map((p) => (
+                {filtered.map((p) => (
                   <ProgramCard key={p.id} p={p} onCompareToggle={toggleCompare} selected={compareIds.includes(p.id)} theme={theme} />
                 ))}
               </div>
 
+              {/* Webinars block */}
               <div className="rounded-2xl p-4 border" style={{ borderColor: theme.border, background: theme.bg }}>
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <div className="text-base font-semibold" style={{ color: theme.heading }}>Бесплатные вебинары</div>
-                    <div className="text-xs mt-1" style={{ color: theme.text }}>Регулярные открытые эфиры с преподавателями и командами программ: формат, учебный план, ответы на вопросы. Бесплатно, запись присылаем после эфира.</div>
+                    <div className="text-xs mt-1" style={{ color: theme.text }}>
+                      Регулярные открытые эфиры с преподавателями и командами программ: формат, учебный план, ответы на вопросы. Бесплатно, запись присылаем после эфира.
+                    </div>
                   </div>
                   <button onClick={() => { haptic.light(); openUrl(SETTINGS.webinars_url); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: theme.chip2, color: theme.heading }}>
                     Открыть календарь вебинаров
@@ -370,26 +597,27 @@
                 </div>
               </div>
 
+              {/* Telegram channel block */}
               <div className="rounded-2xl p-4 border text-center" style={{ borderColor: theme.border, background: theme.bg }}>
                 <div className="text-base font-semibold mb-1" style={{ color: theme.heading }}>Подписывайтесь на Telegram-канал</div>
                 <div className="text-xs mb-3" style={{ color: theme.text }}>Следите за новостями, обновлениями программ и бесплатными мероприятиями.</div>
-                <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.telegram_channel.replace("@", "")}`); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: BRAND.primary, color: "white" }}>
+                <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.telegram_channel.replace('@', '')}`); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: BRAND.primary, color: 'white' }}>
                   Перейти в канал {SETTINGS.telegram_channel}
                 </button>
               </div>
 
-              <div className="pt-6 pb-[calc(40px+env(safe-area-inset-bottom))] text-center text-xs" style={{ color: theme.text }}>
+              {/* Footer */}
+              <div className="pt-6 pb-[calc(40px+var(--sab))] text-center text-xs" style={{ color: theme.text }}>
                 Информация, размещённая в приложении, не является публичной офертой. Актуальные условия обучения, стоимость и документы об образовании уточняйте у менеджера.
-                <div className="mt-2">
-                  ООО «Нетология» · ИНН: <span>{SETTINGS.legal.inn}</span> · Адрес: <span>{SETTINGS.legal.address}</span>
-                </div>
+                <div className="mt-2">ООО «Нетология» · ИНН: <span>{SETTINGS.legal.inn}</span> · Адрес: <span>{SETTINGS.legal.address}</span></div>
               </div>
             </div>
           </div>
         );
       }
 
-      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
     </script>
   </body>
 </html>

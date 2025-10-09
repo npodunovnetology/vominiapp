@@ -3,75 +3,101 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Нетология ДПО — Telegram Mini‑app</title>
-    <!-- Telegram WebApp SDK -->
+    <title>Нетология ДПО — Mini-app (Liquid Glass)</title>
+
+    <!-- Telegram WebApp SDK (безопасный фолбэк) -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Tailwind (CDN) -->
+
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+
     <!-- React 18 UMD -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel for in-browser JSX transform (dev/proto only) -->
+    <!-- Babel для JSX (удобно для демо; в проде лучше собрать) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
     <style>
       :root { --sab: env(safe-area-inset-bottom); }
+      /* ===== Liquid Glass helpers ===== */
+      .glass {
+        background: rgba(255,255,255,0.16);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        border: 1px solid rgba(255,255,255,0.22);
+      }
+      .glass-strong {
+        background: rgba(255,255,255,0.22);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255,255,255,0.28);
+      }
+      .neon-ring { box-shadow: 0 0 0 1px rgba(255,255,255,.25), 0 8px 24px rgba(0,210,255,.25), inset 0 1px 0 rgba(255,255,255,.35); }
+      .pressable { transition: transform .08s ease, filter .2s ease, box-shadow .2s ease; }
+      .pressable:active { transform: translateY(1px) scale(.995); filter: saturate(1.05); }
+
+      /* Таблица: на мобиле оставляем именно таблицу, даём скролл по X и липкий первый столбец */
+      .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .sticky-first th:first-child, .sticky-first td:first-child {
+        position: sticky; left: 0; z-index: 2;
+        background: rgba(255,255,255,0.85);
+        backdrop-filter: blur(12px);
+      }
+      @media (prefers-color-scheme: dark) {
+        .sticky-first th:first-child, .sticky-first td:first-child { background: rgba(20,20,20,0.72); }
+      }
+
+      /* Фон-градиент «Нетологии» (из твоего референса) */
+      body {
+        min-height: 100vh;
+        background: radial-gradient(1200px 600px at 10% -10%, rgba(255,255,255,.6) 0%, rgba(255,255,255,0) 45%),
+                    linear-gradient(135deg, #A0E9FF 0%, #00D2FF 48%, #24B6FF 100%);
+      }
     </style>
   </head>
-  <body class="min-h-screen bg-white">
+
+  <body class="min-h-screen">
+    <!-- Декоративные «жидкие» лужицы (SVG, как в iOS Control Center) -->
+    <svg class="fixed inset-0 -z-10 w-full h-full pointer-events-none" aria-hidden="true">
+      <defs>
+        <!-- Градиент «Нетологии» для акцентов -->
+        <linearGradient id="netologyGradient" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#A0E9FF"/>
+          <stop offset="0.52" stop-color="#00D2FF"/>
+          <stop offset="1" stop-color="#24B6FF"/>
+        </linearGradient>
+        <!-- Мягкий голубой для подсветки -->
+        <radialGradient id="blobCyan" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#00D2FF" stop-opacity=".35"/>
+          <stop offset="1" stop-color="#00D2FF" stop-opacity="0"/>
+        </radialGradient>
+        <!-- Бирюзовый -->
+        <radialGradient id="blobMint" cx="50%" cy="50%" r="50%">
+          <stop offset="0" stop-color="#A0E9FF" stop-opacity=".35"/>
+          <stop offset="1" stop-color="#A0E9FF" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <g>
+        <circle cx="12%" cy="8%" r="220" fill="url(#blobMint)"/>
+        <circle cx="88%" cy="14%" r="260" fill="url(#blobCyan)"/>
+        <circle cx="92%" cy="82%" r="220" fill="url(#blobMint)"/>
+        <circle cx="10%" cy="88%" r="200" fill="url(#blobCyan)"/>
+      </g>
+    </svg>
+
     <div id="root"></div>
 
     <script type="text/babel">
       const { useEffect, useMemo, useState } = React;
 
-      // =====================
-      // BRAND (Netology look)
-      // =====================
+      /* ========= Brand & theme ========= */
       const BRAND = {
-        primary: "#f35b51",
-        text: { base: "#323232", heading: "#000000" },
-        accent: { info: "#00D2FF", success: "#74A333", danger: "#C52524" },
-        neutral: { border: "#CCCCCC", bgCard1: "#F5F5F5", bgCard2: "#D4E4FB", bgCard3: "#D4F6EC" },
+        primary: "#00D2FF",
+        heading: "#0b0b0b",
+        text: "#1f1f1f",
+        border: "rgba(255,255,255,.28)"
       };
 
-      // =====================
-      // SETTINGS (runtime-configurable)
-      // =====================
-      const SETTINGS = {
-        manager: { tg_username: "@netology_vo" },
-        webinars_url: "https://netology.ru/free/degree",
-        telegram_channel: "@netology_degree",
-        legal: {
-          inn: "7726464125",
-          address: "117105, Россия, г. Москва, ш. Варшавское, д. 1, стр. 6, помещ. 2/3",
-        },
-        // Logo: inline SVG (auto color via currentColor), turns white in dark theme, black in light theme
-        logoSvg: `<svg width="150" height="22" viewBox="0 0 150 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g clip-path="url(#clip0_895_25370)">
-<path d="M29.57 4.68595H32.7206V9.57042H38.1149V4.68595H41.2656V17.3141H38.1149V12.1914H32.7206V17.3141H29.57V4.68595Z" fill="currentColor"/>
-<path d="M49.8666 17.6C49.0074 17.6 48.1879 17.4729 47.4082 17.2188C46.6444 16.9488 45.9761 16.5517 45.4032 16.0275C44.8304 15.4874 44.3769 14.8123 44.0427 14.0022C43.7086 13.1762 43.5415 12.2152 43.5415 11.1192V10.6426C43.5415 9.59425 43.7006 8.68089 44.0188 7.90255C44.3371 7.12421 44.7747 6.48089 45.3316 5.97259C45.8885 5.4484 46.533 5.05923 47.265 4.80508C47.9969 4.53504 48.7846 4.40002 49.6279 4.40002C51.617 4.40002 53.1287 4.92421 54.163 5.97259C55.1973 7.02096 55.7144 8.53793 55.7144 10.5235V11.8578H46.7637C46.7796 12.4137 46.8751 12.8982 47.0501 13.3112C47.2252 13.7083 47.4559 14.034 47.7423 14.2881C48.0288 14.5423 48.355 14.7329 48.7209 14.86C49.1028 14.9711 49.4847 15.0267 49.8666 15.0267C50.6782 15.0267 51.2908 14.9076 51.7045 14.6693C52.1182 14.4311 52.4126 14.0816 52.5876 13.621H55.4757C55.2211 14.9394 54.5926 15.9322 53.5901 16.5993C52.5876 17.2665 51.3465 17.6 49.8666 17.6ZM49.7473 6.97331C49.3813 6.97331 49.0153 7.02096 48.6493 7.11627C48.2993 7.21158 47.989 7.36248 47.7185 7.56898C47.448 7.77548 47.2252 8.05345 47.0501 8.40291C46.8751 8.75237 46.7796 9.17331 46.7637 9.66573H52.6592C52.6433 9.14154 52.5558 8.70472 52.3967 8.35526C52.2535 8.0058 52.0466 7.72782 51.7761 7.52132C51.5215 7.31483 51.2192 7.17187 50.8691 7.09244C50.519 7.01302 50.1451 6.97331 49.7473 6.97331Z" fill="currentColor"/>
-<path d="M60.8297 7.30689H56.796V4.68595H68.0141V7.30689H63.9804V17.3141H60.8297V7.30689Z" fill="currentColor"/>
-<path d="M75.4134 17.6C74.5541 17.6 73.7346 17.4729 72.9549 17.2188C72.1911 16.9488 71.5228 16.5437 70.95 16.0036C70.3771 15.4636 69.9236 14.7885 69.5895 13.9784C69.2553 13.1683 69.0882 12.2152 69.0882 11.1192V10.6426C69.0882 9.61013 69.2553 8.70472 69.5895 7.92638C69.9236 7.14804 70.3771 6.49678 70.95 5.97259C71.5228 5.4484 72.1911 5.05923 72.9549 4.80508C73.7346 4.53504 74.5541 4.40002 75.4134 4.40002C76.2727 4.40002 77.0842 4.53504 77.848 4.80508C78.6118 5.05923 79.2801 5.4484 79.8529 5.97259C80.4417 6.49678 80.9031 7.14804 81.2373 7.92638C81.5715 8.70472 81.7385 9.61013 81.7385 10.6426V11.1192C81.7385 12.1993 81.5715 13.1444 81.2373 13.9545C80.9031 14.7646 80.4417 15.4397 79.8529 15.9798C79.2801 16.5199 78.6118 16.9249 77.848 17.195C77.0842 17.465 76.2727 17.6 75.4134 17.6ZM75.4134 14.9314C76.3045 14.9314 77.0444 14.6137 77.6332 13.9784C78.2378 13.343 78.5402 12.3899 78.5402 11.1192V10.6426C78.5402 9.48306 78.2378 8.60147 77.6332 7.99786C77.0444 7.37836 76.3045 7.06862 75.4134 7.06862C74.5064 7.06862 73.7585 7.37836 73.1697 7.99786C72.581 8.60147 72.2866 9.48306 72.2866 10.6426V11.1192C72.2866 12.4058 72.581 13.3668 73.1697 14.0022C73.7585 14.6217 74.5064 14.9314 75.4134 14.9314Z" fill="currentColor"/>
-<path d="M83.883 17.6C83.7557 17.6 83.5966 17.5921 83.4056 17.5762C83.2147 17.5762 83.0555 17.5603 82.9282 17.5285V14.6932C83.0078 14.7091 83.1271 14.717 83.2863 14.717C83.5886 14.717 83.8512 14.6296 84.0739 14.4549C84.2967 14.2643 84.4797 13.9466 84.6229 13.5018C84.782 13.0571 84.8934 12.4693 84.9571 11.7387C85.0366 10.9921 85.0764 10.0708 85.0764 8.97475V4.68595H95.1012V17.3141H91.9505V7.30689H87.9884V9.45129C87.9884 11.0874 87.9008 12.4376 87.7258 13.5018C87.5667 14.5502 87.3121 15.3762 86.962 15.9798C86.6279 16.5834 86.1982 17.0044 85.6731 17.2426C85.1639 17.4809 84.5672 17.6 83.883 17.6Z" fill="currentColor"/>
-<path d="M103.687 17.6C102.828 17.6 102.009 17.4729 101.229 17.2188C100.465 16.9488 99.7967 16.5437 99.2239 16.0036C98.6511 15.4636 98.1976 14.7885 97.8634 13.9784C97.5292 13.1683 97.3622 12.2152 97.3622 11.1192V10.6426C97.3622 9.61013 97.5292 8.70472 97.8634 7.92638C98.1976 7.14804 98.6511 6.49678 99.2239 5.97259C99.7967 5.4484 100.465 5.05923 101.229 4.80508C102.009 4.53504 102.828 4.40002 103.687 4.40002C104.547 4.40002 105.358 4.53504 106.122 4.80508C106.886 5.05923 107.554 5.4484 108.127 5.97259C108.716 6.49678 109.177 7.14804 109.511 7.92638C109.845 8.70472 110.012 9.61013 110.012 10.6426V11.1192C110.012 12.1993 109.845 13.1444 109.511 13.9545C109.177 14.7646 108.716 15.4397 108.127 15.9798C107.554 16.5199 106.886 16.9249 106.122 17.195C105.358 17.465 104.547 17.6 103.687 17.6ZM103.687 14.9314C104.578 14.9314 105.318 14.6137 105.907 13.9784C106.512 13.343 106.814 12.3899 106.814 11.1192V10.6426C106.814 9.48306 106.512 8.60147 105.907 7.99786C105.318 7.37836 104.578 7.06862 103.687 7.06862C102.78 7.06862 102.032 7.37836 101.444 7.99786C100.855 8.60147 100.561 9.48306 100.561 10.6426V11.1192C100.561 12.4058 100.855 13.3668 101.444 14.0022C102.032 14.6217 102.78 14.9314 103.687 14.9314Z" fill="currentColor"/>
-<path d="M112.509 4.68595H121.579V7.30689H115.66V17.3141H112.509V4.68595Z" fill="currentColor"/>
-<path d="M123.482 4.68595H126.633V12.787L132.266 4.68595H135.178V17.3141H132.027V9.21302L126.394 17.3141H123.482V4.68595Z" fill="currentColor"/>
-<path d="M140.604 12.5726C139.634 12.2549 138.926 11.7784 138.48 11.143C138.035 10.5076 137.812 9.76104 137.812 8.90327C137.812 8.28378 137.915 7.71988 138.122 7.21158C138.345 6.68739 138.671 6.24262 139.101 5.87728C139.53 5.49605 140.071 5.20219 140.724 4.99569C141.392 4.78919 142.172 4.68595 143.063 4.68595H149.03V17.3141H145.879V12.9538H143.612L140.867 17.3141H137.334L140.604 12.5726ZM140.962 8.90327C140.962 9.44335 141.137 9.84046 141.488 10.0946C141.854 10.3488 142.339 10.4758 142.944 10.4758H145.879V7.30689H142.944C142.339 7.30689 141.854 7.4419 141.488 7.71194C141.137 7.96609 140.962 8.3632 140.962 8.90327Z" fill="currentColor"/>
-<path d="M6.21414 11.5117C6.35751 11.5117 6.49946 11.519 6.63992 11.5303C6.94633 13.9768 8.93716 15.897 11.4153 16.0967C11.4424 16.3127 11.4583 16.5325 11.4583 16.7559C11.4583 19.6521 9.11041 22 6.21414 22C3.3179 22 0.97003 19.6521 0.970001 16.7559C0.970002 13.8596 3.31788 11.5117 6.21414 11.5117Z" fill="currentColor"/>
-<path d="M6.21414 0C9.11041 2.87854e-07 11.4583 2.34788 11.4583 5.24414C11.4583 5.3789 11.4507 5.51233 11.4407 5.64453C8.86453 5.83957 6.80957 7.89453 6.61453 10.4707C6.48233 10.4807 6.3489 10.4883 6.21414 10.4883C3.31788 10.4883 0.970001 8.14041 0.970001 5.24414C0.970026 2.34789 3.31789 2.48539e-05 6.21414 0Z" fill="currentColor"/>
-<path d="M17.7259 0C20.6221 2.30574e-05 22.97 2.34789 22.97 5.24414C22.97 8.14041 20.6221 10.4883 17.7259 10.4883C17.5025 10.4883 17.2827 10.4724 17.0667 10.4453C16.867 7.96716 14.9468 5.97633 12.5003 5.66992C12.489 5.52946 12.4817 5.38751 12.4817 5.24414C12.4817 2.34788 14.8296 -5.40937e-07 17.7259 0Z" fill="currentColor"/>
-<path d="M17.7259 11.5117C20.6221 11.5117 22.97 13.8596 22.97 16.7559C22.97 19.6521 20.6221 22 17.7259 22C14.8296 22 12.4817 19.6521 12.4817 16.7559C12.4817 16.5231 12.4982 16.2941 12.5276 16.0693C14.8754 15.7627 16.7327 13.9054 17.0393 11.5576C17.2641 11.5282 17.4931 11.5117 17.7259 11.5117Z" fill="currentColor"/>
-</g>
-<defs>
-<clipPath id="clip0_895_25370">
-<rect width="148.06" height="22" fill="white" transform="translate(0.970001)"/>
-</clipPath>
-</defs>
-</svg>`,
-      };
-
-      // =====================
-      // Telegram helpers (WebApp compliance)
-      // =====================
       const getTG = () => (typeof window !== 'undefined' ? window?.Telegram?.WebApp : undefined);
       const openUrl = (url) => {
         const tg = getTG();
@@ -83,114 +109,39 @@
         if (tg?.openTelegramLink) tg.openTelegramLink(url);
         else window.open(url, '_blank', 'noopener,noreferrer');
       };
-
-      // Haptics
       const haptic = {
         light: () => getTG()?.HapticFeedback?.impactOccurred?.('light'),
         selection: () => getTG()?.HapticFeedback?.selectionChanged?.(),
         success: () => getTG()?.HapticFeedback?.notificationOccurred?.('success'),
       };
 
-      // Auto-theme (reads Telegram themeParams with fallbacks to BRAND)
       function getThemeFromTG() {
         const p = getTG()?.themeParams || {};
+        const dark = getTG()?.colorScheme === 'dark';
         return {
-          bg: p.bg_color || '#FFFFFF',
-          bgSecondary: p.secondary_bg_color || BRAND.neutral.bgCard1,
-          text: p.text_color || BRAND.text.base,
-          heading: p.text_color || BRAND.text.heading,
-          hint: p.hint_color || '#6b6b6b',
-          link: p.link_color || BRAND.primary,
-          border: p.section_separator_color || BRAND.neutral.border,
-          button: BRAND.primary,
+          dark,
+          bg: 'transparent',
+          panel: dark ? 'rgba(20,22,24,.55)' : 'rgba(255,255,255,.55)',
+          panelStrong: dark ? 'rgba(30,32,36,.65)' : 'rgba(255,255,255,.7)',
+          text: p.text_color || (dark ? '#ECECEC' : '#1f1f1f'),
+          heading: p.text_color || (dark ? '#FFFFFF' : '#0b0b0b'),
+          border: p.section_separator_color || BRAND.border,
           buttonText: p.button_text_color || '#FFFFFF',
-          chip1: BRAND.neutral.bgCard2, // голубая
-          chip2: BRAND.neutral.bgCard3, // зелёная
         };
       }
-
       function useTelegramTheme() {
         const [theme, setTheme] = useState(getThemeFromTG());
         useEffect(() => {
           const tg = getTG();
-          if (!tg) return;
           const onChange = () => setTheme(getThemeFromTG());
-          tg.onEvent?.('themeChanged', onChange);
-          return () => tg.offEvent?.('themeChanged', onChange);
+          tg?.onEvent?.('themeChanged', onChange);
+          return () => tg?.offEvent?.('themeChanged', onChange);
         }, []);
         return theme;
       }
 
-      // =====================
-      // Typograph helpers (RU)
-      // =====================
-      const NBSP = '\u00A0';
-      function ruTypo(str) {
-        if (!str || typeof str !== 'string') return str;
-        let s = str;
-        // 1) Неразрывный пробел после одно- и некоторых двубуквенных предлогов/союзов
-        s = s.replace(/(^|[\s(«])([ВвКкСсУуОоИиАа])\s+(?=\S)/g, `$1$2${NBSP}`);
-        s = s.replace(/(^|[\s(«])((?:из|за|на|по|от|до|об))\s+(?=\S)/gi, `$1$2${NBSP}`);
-        // 2) Дефис на тире
-        s = s.replace(/\s+-\s+/g, ' — ');
-        // 3) Неразрывный пробел между числом и ед. измерения/знаком валюты/процентом
-        s = s.replace(/(\d)\s+(₽|%)/g, `$1${NBSP}$2`);
-        s = s.replace(/(\d)\s+(мес)/gi, `$1${NBSP}$2`);
-        return s;
-      }
-      const T = ({ children }) => (typeof children === 'string' ? ruTypo(children) : children);
-
-      // =====================
-      // DATA — Programs
-      // =====================
+      /* ========= Data ========= */
       const PROGRAMS = [
-        {
-          id: 'dpo-lead-future',
-          title: 'Руководитель будущего: адаптация к новым технологиям и управление результатами',
-          partners: ['РЭУ им. Г.В. Плеханова'],
-          start_date: '2025-11-10',
-          duration_months_est: 5,
-          price_full_rub: 219600,
-          price_from_per_month_rub: 9630,
-          landing_url: 'https://netology.ru/programs/upravlenie-rezultatami',
-          audience: [
-            'Руководителям и тимлидам, которые хотят выстроить управление по результатам',
-            'Специалистам, растущим в менеджеры и лиды',
-            'Предпринимателям, внедряющим data-driven практики',
-          ],
-          diploma: 'Два диплома о профессиональной переподготовке: РЭУ им. Г.В. Плеханова и Нетологии',
-          learn: [
-            'Метрики, KPI, OKR и управление по результатам',
-            'Инструменты адаптации к ИИ и новым технологиям',
-            'Коммуникация и проектное управление в условиях изменений',
-          ],
-          about:
-            'Программа для лидеров, которым нужно масштабировать результат и встроить новые технологии в ежедневные процессы. Программа обновляется каждый набор и даёт самые актуальные знания.',
-        },
-        {
-          id: 'dpo-product-marketing',
-          title: 'Стратегии развития продукта: управление продажами и клиентским опытом',
-          partners: ['РАНХиГС'],
-          start_date: '2025-11-05',
-          duration_months_est: 5,
-          price_full_rub: 368100,
-          price_from_per_month_rub: 16145,
-          landing_url: 'https://netology.ru/programs/strategii-razvitiya-produkta',
-          audience: [
-            'Руководителям и собственникам, кто отвечает за рост продукта',
-            'Продакт-менеджерам и маркетологам, которым нужны фреймворки PMM',
-            'Тем, кто строит стратегию и управляет клиентским опытом',
-          ],
-          diploma:
-            'Диплом о профессиональной переподготовке Нетологии и удостоверение о повышении квалификации РАНХиГС',
-          learn: [
-            'Стратегия продукта и управление воронкой продаж',
-            'Сегментация, JTBD и Customer Journey',
-            'Юнит-экономика и product analytics',
-          ],
-          about:
-            'Фокус на стратегии и росте: выстраиваем системный product-подход от исследований до монетизации. Программа обновляется каждый набор и даёт самые актуальные знания.',
-        },
         {
           id: 'dpo-python-mfti',
           title: 'Python: от кода к стартапу',
@@ -202,17 +153,16 @@
           landing_url: 'https://netology.ru/programs/razrabotchik-на-python-с-mfti',
           audience: [
             'Новичкам, которые хотят войти в разработку на Python',
-            'Аналитикам и инженерам, автоматизирующим задачи и скрипты',
-            'Специалистам смежных областей (QA, DevOps, BI), кто усиливает навыки кодинга',
+            'Аналитикам и инженерам для автоматизации задач',
+            'Специалистам смежных областей (QA, DevOps, BI)'
           ],
-          diploma: 'Два диплома о профессиональной переподготовке: МФТИ и Нетологии',
+          diploma: 'Два диплома о профпереподготовке: МФТИ и Нетологии',
           learn: [
-            'Основы Python, ООП, работа с API и БД',
-            'Web-разработка/скрипты/боты, деплой',
-            'От идеи до MVP: проект и питч-документация',
+            'Python, ООП, API, БД',
+            'Web/скрипты/боты, деплой',
+            'Проект от идеи до MVP'
           ],
-          about:
-            'Путь от базового коду до работающего прототипа: соберёте свой проект и научитесь презентовать результат. Программа обновляется каждый набор и даёт самые актуальные знания.',
+          about: 'Путь от базового кода до работающего прототипа с питчем.'
         },
         {
           id: 'dpo-ai-pm-mfti',
@@ -222,131 +172,80 @@
           duration_months_est: 3,
           price_full_rub: 114700,
           price_from_per_month_rub: 5031,
-          landing_url:
-            'https://netology.ru/programs/rukovoditel-proektov-v-oblasti-iskusstvennogo-intellekta-dpo-mfti',
+          landing_url: 'https://netology.ru/programs/rukovoditel-proektov-v-oblasti-iskusstvennogo-intellekta-dpo-mfti',
           audience: [
             'Менеджерам и продактам, запускающим AI-инициативы',
-            'Руководителям в бизнесе и госсекторе, внедряющим ИИ в процессы',
-            'Тем, кто координирует команды ML/DS/интеграции',
+            'Руководителям, внедряющим ИИ',
+            'Координаторам ML/DS-команд'
           ],
           diploma: 'Два удостоверения о повышении квалификации: МФТИ и Нетологии',
           learn: [
-            'Цикл AI-проекта: бизнес-цель → данные → модель → внедрение',
-            'Оценка эффекта, рисков и соответствия',
-            'Коммуникация между бизнесом и ML-командой',
+            'Цикл AI-проекта и внедрение',
+            'Оценка эффекта, рисков, соответствия',
+            'Коммуникация бизнес ↔ ML-команда'
           ],
-          about:
-            'Системный менеджмент AI-проектов: от постановки задачи до внедрения в контур компании. Программа обновляется каждый набор и даёт самые актуальные знания.',
+          about: 'Системный менеджмент AI-проектов от постановки до релиза.'
         },
-        {
-          id: 'dpo-analyst-mfti',
-          title: 'Аналитик данных',
-          partners: ['МФТИ'],
-          start_date: '2025-10-20',
-          duration_months_est: 10,
-          price_full_rub: 200250,
-          price_from_per_month_rub: 8343,
-          landing_url: 'https://netology.ru/programs/professiya-analitik-dannyh-mfti',
-          audience: [
-            'Тем, кто любит цифры и хочет развиваться на стыке IT и бизнеса',
-            'Новичкам, которые хотят получить профессию в аналитике',
-            'Практикам, кому нужны инструменты аналитики для более сложных задач',
-            'Тем, кто уже работает с данными и планирует смену траектории',
-          ],
-          diploma: 'Два диплома о профессиональной переподготовке: МФТИ и Нетологии',
-          learn: [
-            'SQL, Python для аналитики, визуализация',
-            'AB-тесты, статистика и продуктовые метрики',
-            'Дашборды и презентация инсайтов',
-          ],
-          about:
-            'Освоите инструменты аналитика и соберёте портфолио из практических кейсов. Программа обновляется каждый набор и даёт самые актуальные знания.',
-        },
-        {
-          id: 'dpo-pm-it-ranhigs',
-          title: 'Управление проектами и командами в IT',
-          partners: ['РАНХиГС'],
-          start_date: '2025-11-17',
-          duration_months_est: 7,
-          price_full_rub: 200250,
-          price_from_per_month_rub: 8343,
-          landing_url: 'https://netology.ru/programs/professiya-menedzher-proektov-v-it-ranhigs',
-          audience: [
-            'Действующим и начинающим проджект-менеджерам в IT',
-            'Тимлидам и руководителям, которым нужно прокачать управление командой',
-            'Специалистам смежных ролей, переходящим в управление проектами',
-          ],
-          diploma:
-            'Диплом о профессиональной переподготовке Нетологии и удостоверение о повышении квалификации РАНХиГС',
-          learn: [
-            'Планирование, риски, бюджет и коммуникации',
-            'Agile/Waterfall/гибридные подходы',
-            'Управление командой и стейкхолдерами',
-          ],
-          about:
-            'Выстроите системное управление проектами и командой на практике. Программа обновляется каждый набор и даёт самые актуальные знания.',
-        },
-        {
-          id: 'dpo-devsecops-hse',
-          title: 'DevSecOps',
-          partners: ['НИУ ВШЭ'],
-          start_date: '2025-10-27',
-          duration_months_est: 6,
-          price_full_rub: 179600,
-          price_from_per_month_rub: 7875,
-          landing_url: 'https://netology.ru/programs/devsecops',
-          audience: [
-            'DevOps/SRE-инженерам, кто интегрирует безопасность на всех этапах SDLC',
-            'Backend/Platform инженерам, отвечающим за релизы и инфраструктуру',
-            'SEC-специалистам, которым нужно говорить с Dev на одном языке',
-          ],
-          diploma: 'Два диплома о профессиональной переподготовке: НИУ ВШЭ и Нетологии',
-          learn: [
-            'Практики безопасной разработки и CI/CD',
-            'Угрозы, тестирование и мониторинг безопасности',
-            'Построение secure-pipeline и культура DevSecOps',
-          ],
-          about:
-            'Интегрируете безопасность в процессы DevOps и отработаете инструменты на кейсах. Программа обновляется каждый набор и даёт самые актуальные знания.',
-        },
+        /* добавь остальные программы по желанию — структура та же */
       ];
-
-      // =====================
-      // Helpers
-      // =====================
       const rub = (n) => new Intl.NumberFormat('ru-RU').format(n);
       const dstr = (s) => new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
 
-      function Badge({ children, theme }) {
+      /* ========= UI primitives ========= */
+      const Chip = ({children}) => (
+        <span className="px-2 py-1 rounded-full text-[11px] leading-none glass neon-ring text-gray-900/90 dark:text-white/90">
+          {children}
+        </span>
+      );
+
+      function TopBar({ theme }) {
         return (
-          <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: theme.chip1, color: '#000000' }}>
-            <T>{children}</T>
-          </span>
+          <div className="sticky top-0 z-20">
+            <div className="mx-auto max-w-5xl px-4 pt-[max(12px,env(safe-area-inset-top))] pb-3">
+              <div className="glass neon-ring rounded-2xl px-3 py-2 flex items-center justify-between pressable">
+                <div className="flex items-center gap-2">
+                  <!-- простая текстовая версия логотипа, можно заменить на твой SVG -->
+                  <span className="text-sm font-semibold bg-clip-text text-transparent" style={{backgroundImage: 'url(#)'}} >
+                    <span style="background:linear-gradient(90deg,#111, #333); -webkit-background-clip:text; background-clip:text;">Нетология · ДПО</span>
+                  </span>
+                </div>
+                <button
+                  className="px-3 py-1.5 rounded-xl text-sm text-white pressable"
+                  style={{ background: 'url(#)', backgroundImage: 'linear-gradient(90deg,#00D2FF,#24B6FF)' }}
+                  onClick={() => openTelegram('https://t.me/netology')}
+                >
+                  Написать менеджеру
+                </button>
+              </div>
+            </div>
+          </div>
         );
       }
 
-      // Modal wrapper integrating Telegram BackButton
-      function ModalWithTGBack({ title, onClose, children, theme }) {
+      function Modal({ title, onClose, children, theme }) {
         useEffect(() => {
           const tg = getTG();
-          if (!tg?.BackButton) return;
-          try {
-            tg.BackButton.show();
-            const handler = () => { haptic.selection?.(); onClose?.(); };
-            tg.onEvent?.('backButtonClicked', handler);
-            return () => { tg.BackButton.hide(); tg.offEvent?.('backButtonClicked', handler); };
-          } catch {}
+          try { tg?.BackButton?.show(); } catch {}
+          const handler = () => onClose?.();
+          tg?.onEvent?.('backButtonClicked', handler);
+          return () => {
+            try { tg?.BackButton?.hide(); } catch {}
+            tg?.offEvent?.('backButtonClicked', handler);
+          };
         }, [onClose]);
 
         return (
-          <div className="p-4 md:p-6">
-            <div className="flex items-start justify-between gap-4">
-              <h4 className="text-base md:text-lg font-semibold" style={{ color: theme?.heading || BRAND.text.heading }}><T>{title}</T></h4>
-              <button onClick={() => { haptic.light(); onClose(); }} className="text-sm" style={{ color: theme?.text || BRAND.text.base }}>
-                Закрыть
-              </button>
+          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+            <div className="relative w-full md:max-w-2xl md:rounded-3xl glass-strong neon-ring md:shadow-2xl">
+              <div className="p-4 md:p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <h3 className="text-lg font-semibold" style={{color: theme.heading}}>{title}</h3>
+                  <button onClick={onClose} className="text-sm opacity-80 hover:opacity-100">Закрыть</button>
+                </div>
+                {children}
+              </div>
             </div>
-            {children}
           </div>
         );
       }
@@ -354,133 +253,122 @@
       function ProgramCard({ p, onCompareToggle, selected, theme }) {
         const [open, setOpen] = useState(false);
         return (
-          <div className="rounded-2xl p-4 shadow-sm border" style={{ borderColor: theme.border, background: theme.bg }}>
+          <div className="glass neon-ring rounded-3xl p-4 md:p-5 pressable">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold" style={{ color: theme.heading }}><T>{p.title}</T></h3>
-                <div className="mt-1 text-sm" style={{ color: theme.text }}><T>Партнёр:</T> <T>{p.partners.join(', ')}</T></div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Badge theme={theme}>Старт: {dstr(p.start_date)}</Badge>
-                  <Badge theme={theme}>Длительность: {p.duration_months_est} мес</Badge>
-                  <Badge theme={theme}>Цена: {rub(p.price_full_rub)} ₽</Badge>
-                  <Badge theme={theme}>От {rub(p.price_from_per_month_rub)} ₽/мес</Badge>
+                <div className="text-base md:text-lg font-semibold" style={{color: theme.heading}}>
+                  {p.title}
+                </div>
+                <div className="mt-1 text-sm opacity-80">Партнёр: {p.partners.join(', ')}</div>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  <Chip>Старт: {dstr(p.start_date)}</Chip>
+                  <Chip>{p.duration_months_est} мес</Chip>
+                  <Chip>{rub(p.price_full_rub)} ₽</Chip>
+                  <Chip>от {rub(p.price_from_per_month_rub)} ₽/мес</Chip>
                 </div>
               </div>
-              <button onClick={() => { haptic.selection(); onCompareToggle(p.id); }} className={`px-3 py-2 rounded-xl text-sm border ${selected ? 'font-semibold' : ''}`} style={{ borderColor: theme.border }}>
-                <T>{selected ? 'В сравнении' : 'Сравнить'}</T>
+              <button
+                onClick={() => onCompareToggle(p.id)}
+                className={`px-3 py-2 rounded-xl text-xs md:text-sm glass neon-ring pressable ${selected ? 'font-semibold' : ''}`}
+              >
+                {selected ? 'В сравнении' : 'Сравнить'}
               </button>
             </div>
 
-            <div className="mt-3 grid gap-2">
-              <div className="text-sm" style={{ color: theme.text }}>
-                <span className="font-medium"><T>Кому подойдёт:</T></span>
-                <ul className="list-disc ml-5 mt-1 space-y-1">
-                  {p.audience.map((a, i) => <li key={i}><T>{a}</T></li>)}
-                </ul>
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button onClick={() => { haptic.light(); openUrl(p.landing_url); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: BRAND.primary, color: 'white' }}>
-                Посмотреть программу
+            <div className="mt-4 flex gap-2">
+              <button
+                className="flex-1 py-2 rounded-xl text-white pressable"
+                style={{ backgroundImage: 'linear-gradient(90deg,#00D2FF,#24B6FF)'}}
+                onClick={() => openUrl(p.landing_url)}
+              >
+                Открыть программу
               </button>
-              <button onClick={() => { haptic.light(); setOpen(true); }} className="px-4 py-2 rounded-xl text-sm border" style={{ borderColor: theme.border }}>
+              <button
+                className="flex-1 py-2 rounded-xl pressable glass"
+                onClick={() => setOpen(true)}
+              >
                 Подробнее
-              </button>
-              <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.manager.tg_username.replace('@', '')}`); }} className="px-4 py-2 rounded-xl text-sm border" style={{ borderColor: theme.border }}>
-                Написать менеджеру
               </button>
             </div>
 
             {open && (
-              <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
-                <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
-                <div className="relative w-full md:max-w-2xl md:rounded-2xl md:shadow-xl md:border" style={{ background: theme.bg, borderColor: theme.border }}>
-                  <ModalWithTGBack title={p.title} onClose={() => setOpen(false)} theme={theme}>
-                    <div className="mt-3 text-sm" style={{ color: theme.text }}><T>{p.about}</T></div>
-                    <div className="mt-4">
-                      <div className="text-sm font-medium" style={{ color: theme.heading }}><T>Чему научитесь</T></div>
-                      <ul className="list-disc ml-5 mt-1 space-y-1 text-sm">{p.learn.map((x, i) => <li key={i}><T>{x}</T></li>)}</ul>
-                    </div>
-                    <div className="mt-4 text-sm" style={{ color: theme.text }}>
-                      <span className="font-medium"><T>Документ:</T></span> <T>{p.diploma}</T>
-                    </div>
-                    <div className="mt-5 flex gap-2">
-                      <button onClick={() => { haptic.light(); openUrl(p.landing_url); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: BRAND.primary, color: 'white' }}>
-                        Посмотреть программу
-                      </button>
-                      <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.manager.tg_username.replace('@', '')}`); }} className="px-4 py-2 rounded-xl text-sm border" style={{ borderColor: theme.border }}>
-                        Написать менеджеру
-                      </button>
-                    </div>
-                  </ModalWithTGBack>
+              <Modal title={p.title} onClose={() => setOpen(false)} theme={theme}>
+                <div className="mt-2 text-sm opacity-90">{p.about}</div>
+
+                <div className="mt-4">
+                  <div className="text-sm font-medium" style={{color: theme.heading}}>Кому подойдёт</div>
+                  <ul className="list-disc ml-5 mt-1 text-sm opacity-90 space-y-1">
+                    {p.audience.map((a,i)=><li key={i}>{a}</li>)}
+                  </ul>
                 </div>
-              </div>
+
+                <div className="mt-4">
+                  <div className="text-sm font-medium" style={{color: theme.heading}}>Чему научитесь</div>
+                  <ul className="list-disc ml-5 mt-1 text-sm opacity-90 space-y-1">
+                    {p.learn.map((a,i)=><li key={i}>{a}</li>)}
+                  </ul>
+                </div>
+
+                <div className="mt-4 text-sm opacity-90">
+                  <span className="font-medium">Документ: </span>{p.diploma}
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <button
+                    className="px-4 py-2 rounded-xl text-white pressable"
+                    style={{ backgroundImage: 'linear-gradient(90deg,#00D2FF,#24B6FF)'}}
+                    onClick={() => openUrl(p.landing_url)}
+                  >
+                    Перейти на сайт
+                  </button>
+                  <button
+                    className="px-4 py-2 rounded-xl glass pressable"
+                    onClick={() => openTelegram('https://t.me/netology')}
+                  >
+                    Написать менеджеру
+                  </button>
+                </div>
+              </Modal>
             )}
           </div>
         );
       }
 
-      // Responsive Compare: cards on mobile, table on desktop
+      /* ======== Compare Table — всегда таблица, с горизонтальным скроллом на мобиле ======== */
       function CompareTable({ ids, onReset, theme }) {
-        const data = PROGRAMS.filter((p) => ids.includes(p.id));
-        if (data.length === 0) return null;
+        const data = PROGRAMS.filter(p => ids.includes(p.id));
+        if (!data.length) return null;
+
         return (
-          <div className="rounded-2xl p-4 border" style={{ borderColor: theme.border, background: theme.bg }}>
-            <div className="flex items-center justify-between">
-              <h4 className="text-base font-semibold" style={{ color: theme.heading }}><T>Сравнение программ</T></h4>
-              <button onClick={() => { haptic.selection(); onReset(); }} className="px-3 py-1.5 rounded-xl text-sm border" style={{ borderColor: theme.border }}><T>Сбросить</T></button>
+          <div className="glass neon-ring rounded-3xl p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-base font-semibold" style={{color: theme.heading}}>Сравнение программ</div>
+              <button onClick={onReset} className="px-3 py-1.5 rounded-xl text-sm glass pressable">Сбросить</button>
             </div>
 
-            {/* Mobile: stacked cards */}
-            <div className="md:hidden mt-3 grid gap-3">
-              {data.map((p) => (
-                <div key={p.id} className="rounded-xl p-3 border" style={{ borderColor: theme.border }}>
-                  <div className="text-sm font-semibold" style={{ color: theme.heading }}><T>{p.title}</T></div>
-                  <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-xs" style={{ color: theme.text }}>
-                    <div className="opacity-70"><T>Вуз-партнёр</T></div><div><T>{p.partners.join(', ')}</T></div>
-                    <div className="opacity-70"><T>Старт</T></div><div><T>{dstr(p.start_date)}</T></div>
-                    <div className="opacity-70"><T>Длительность</T></div><div><T>{p.duration_months_est} мес</T></div>
-                    <div className="opacity-70"><T>Цена</T></div><div><T>{rub(p.price_full_rub)} ₽</T></div>
-                    <div className="opacity-70"><T>От ₽/мес</T></div><div><T>{rub(p.price_from_per_month_rub)} ₽</T></div>
-                    <div className="opacity-70"><T>Документ</T></div><div><T>{p.diploma}</T></div>
-                  </div>
-                  <div className="mt-2">
-                    <div className="text-xs font-medium" style={{ color: theme.heading }}><T>Навыки</T></div>
-                    <ul className="list-disc ml-4 mt-1 space-y-0.5 text-xs" style={{ color: theme.text }}>
-                      {p.learn.map((skill, i) => <li key={i}><T>{skill}</T></li>)}
-                    </ul>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Desktop: table */}
-            <div className="hidden md:block mt-2">
-              <table className="w-full text-sm whitespace-normal break-words leading-snug">
+            <div className="table-scroll mt-3 rounded-2xl">
+              <table className="min-w-[760px] w-full text-sm leading-snug sticky-first">
                 <thead>
-                  <tr className="text-left" style={{ color: theme.text }}>
-                    <th className="py-2 pr-3 w-[26%]"><T>Программа</T></th>
-                    <th className="py-2 pr-3 w-[16%]"><T>Вуз-партнёр</T></th>
-                    <th className="py-2 pr-3 w-[12%]"><T>Старт</T></th>
-                    <th className="py-2 pr-3 w-[12%]"><T>Длительность</T></th>
-                    <th className="py-2 pr-3 w-[12%]"><T>Цена</T></th>
-                    <th className="py-2 pr-3 w-[12%]"><T>От ₽/мес</T></th>
-                    <th className="py-2 pr-3 w-[30%]"><T>Документ</T></th>
-                    <th className="py-2 pr-0 w-[34%]"><T>Навыки</T></th>
+                  <tr className="text-left">
+                    <th className="py-2 pr-3 w-[28%]">Программа</th>
+                    <th className="py-2 pr-3 w-[16%]">Вуз-партнёр</th>
+                    <th className="py-2 pr-3 w-[12%]">Старт</th>
+                    <th className="py-2 pr-3 w-[12%]">Длительность</th>
+                    <th className="py-2 pr-3 w-[12%]">Цена</th>
+                    <th className="py-2 pr-3 w-[14%]">От ₽/мес</th>
+                    <th className="py-2 pr-3 w-[40%]">Навыки</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((p) => (
-                    <tr key={p.id} className="border-t align-top" style={{ borderColor: theme.border }}>
-                      <td className="py-2 pr-3"><T>{p.title}</T></td>
-                      <td className="py-2 pr-3"><T>{p.partners.join(', ')}</T></td>
-                      <td className="py-2 pr-3"><T>{dstr(p.start_date)}</T></td>
-                      <td className="py-2 pr-3"><T>{p.duration_months_est} мес</T></td>
-                      <td className="py-2 pr-3"><T>{rub(p.price_full_rub)} ₽</T></td>
-                      <td className="py-2 pr-3"><T>{rub(p.price_from_per_month_rub)} ₽</T></td>
-                      <td className="py-2 pr-3"><T>{p.diploma}</T></td>
-                      <td className="py-2 pr-0"><ul className="list-disc ml-4">{p.learn.map((s, i) => <li key={i}><T>{s}</T></li>)}</ul></td>
+                  {data.map(p => (
+                    <tr key={p.id} className="border-t border-white/30">
+                      <td className="py-2 pr-3 font-medium">{p.title}</td>
+                      <td className="py-2 pr-3">{p.partners.join(', ')}</td>
+                      <td className="py-2 pr-3">{dstr(p.start_date)}</td>
+                      <td className="py-2 pr-3">{p.duration_months_est} мес</td>
+                      <td className="py-2 pr-3">{rub(p.price_full_rub)} ₽</td>
+                      <td className="py-2 pr-3">{rub(p.price_from_per_month_rub)} ₽</td>
+                      <td className="py-2 pr-3"><span className="opacity-90">{p.learn.join(' · ')}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -490,43 +378,27 @@
         );
       }
 
+      /* ========= Filters ========= */
       function Filters({ partner, setPartner, theme }) {
         const partners = useMemo(() => {
           const set = new Set();
-          PROGRAMS.forEach((p) => p.partners.forEach((x) => set.add(x)));
+          PROGRAMS.forEach(p => p.partners.forEach(x => set.add(x)));
           return ['Все вузы', ...Array.from(set)];
         }, []);
         return (
           <div className="flex gap-2">
-            <select value={partner} onChange={(e) => { haptic.selection(); setPartner(e.target.value); }} className="px-3 py-2 rounded-xl border w-full md:w-1/3" style={{ borderColor: theme.border, background: theme.bg, color: theme.text }}>
-              {partners.map((p) => <option key={p} value={p}><T>{p}</T></option>)}
+            <select
+              value={partner}
+              onChange={(e)=>{ haptic.selection(); setPartner(e.target.value); }}
+              className="w-full md:w-1/3 glass neon-ring rounded-2xl px-3 py-2"
+            >
+              {partners.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
         );
       }
 
-      // =====================
-      // Topbar Logo component (inline SVG + auto theme color)
-      // =====================
-      function LogoBrand() {
-        const theme = useTelegramTheme();
-        const tg = getTG();
-        const color = tg?.colorScheme === 'dark' ? '#FFFFFF' : '#000000';
-        if (SETTINGS.logoSvg) {
-          return (
-            <span className="h-6 inline-flex items-center" style={{ color }} dangerouslySetInnerHTML={{ __html: SETTINGS.logoSvg }} />
-          );
-        }
-        return (
-          <span className="text-base font-semibold" style={{ color }}>
-            <T>Нетология — программы с вузами</T>
-          </span>
-        );
-      }
-
-      // =====================
-      // APP (root component)
-      // =====================
+      /* ========= App ========= */
       function App() {
         const [partner, setPartner] = useState('Все вузы');
         const [compareIds, setCompareIds] = useState([]);
@@ -535,105 +407,54 @@
         useEffect(() => {
           const tg = getTG();
           if (tg) {
-            try {
-              tg.ready();
-              tg.expand?.();
-              tg.setHeaderColor?.('bg_color');
-              tg.setBackgroundColor?.('secondary_bg_color');
-            } catch {}
+            try { tg.ready(); tg.expand?.(); tg.setHeaderColor?.('bg_color'); tg.setBackgroundColor?.('secondary_bg_color'); } catch {}
           }
         }, []);
 
-        const filtered = useMemo(() => PROGRAMS.filter((p) => partner === 'Все вузы' || p.partners.includes(partner)), [partner]);
-        const toggleCompare = (id) => setCompareIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id].slice(-3)));
+        const filtered = useMemo(
+          () => PROGRAMS.filter(p => partner === 'Все вузы' || p.partners.includes(partner)),
+          [partner]
+        );
+
+        const toggleCompare = (id) =>
+          setCompareIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id].slice(-4)));
 
         return (
-          <div className="min-h-screen" style={{ background: theme.bgSecondary, color: theme.text }}>
-            {/* TOP BAR */}
-            <div className="sticky top-0 z-10" style={{ background: theme.bg, borderBottom: `1px solid ${theme.border}` }}>
-              <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <LogoBrand />
-                </div>
-                <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.manager.tg_username.replace('@', '')}`); }} className="px-3 py-1.5 rounded-xl text-sm" style={{ background: BRAND.primary, color: 'white' }}>
-                  <T>Написать менеджеру</T>
-                </button>
-              </div>
-            </div>
-
-            {/* CONTENT */}
-            <div className="max-w-5xl mx-auto px-4 py-4 grid gap-4">
-              {/* Intro heading */}
-              <div className="text-left mb-2">
-                <h2 className="text-lg md:text-xl font-semibold" style={{ color: theme.heading }}>
-                  <T>Дополнительное профессиональное онлайн-образование в ведущих вузах страны</T>
-                </h2>
-                <p className="mt-1 text-sm md:text-base" style={{ color: theme.text }}>
-                  <T>Чтобы усилить ваше резюме и выделиться на фоне других кандидатов</T>
+          <div className="min-h-screen">
+            <TopBar theme={theme} />
+            <main className="max-w-5xl mx-auto px-4 pb-[calc(40px+var(--sab))]">
+              <header className="pt-3 pb-2">
+                <h1 className="text-lg md:text-xl font-semibold" style={{color: theme.heading}}>
+                  Программы ДПО с дипломом вуза
+                </h1>
+                <p className="opacity-90 text-sm md:text-base">
+                  Усильте резюме и подтвердите навыки документами партнёрского вуза и Нетологии.
                 </p>
-              </div>
+              </header>
 
-              {/* Intro cards */}
-              <div className="grid md:grid-cols-2 gap-3">
-                <div className="rounded-2xl p-4" style={{ background: theme.chip2, color: '#000000' }}>
-                  <div className="text-sm" style={{ color: '#000000' }}><T>Что такое ДПО</T></div>
-                  <div className="mt-1 text-xs"><T>Краткие практические программы повышения квалификации или переподготовки. Итог: документ вуза-партнёра и документ Нетологии (в зависимости от программы — диплом о профпереподготовке или удостоверение о повышении квалификации).</T></div>
-                </div>
-                <div className="rounded-2xl p-4" style={{ background: theme.chip1, color: '#000000' }}>
-                  <div className="text-sm" style={{ color: '#000000' }}><T>Формат</T></div>
-                  <div className="mt-1 text-xs"><T>Онлайн, записи занятий, гибкий график. Рекомендованная нагрузка: 20–30 ч/нед.</T></div>
-                </div>
-              </div>
+              <section className="mt-3">
+                <Filters partner={partner} setPartner={setPartner} theme={theme} />
+              </section>
 
-              {/* Filters */}
-              <Filters partner={partner} setPartner={setPartner} theme={theme} />
+              <section className="mt-4">
+                <CompareTable ids={compareIds} onReset={()=>setCompareIds([])} theme={theme} />
+              </section>
 
-              {/* Compare table */}
-              <CompareTable ids={compareIds} onReset={() => setCompareIds([])} theme={theme} />
-
-              {/* Programs list */}
-              <div className="grid gap-3">
-                {filtered.map((p) => (
+              <section className="mt-4 grid gap-3">
+                {filtered.map(p => (
                   <ProgramCard key={p.id} p={p} onCompareToggle={toggleCompare} selected={compareIds.includes(p.id)} theme={theme} />
                 ))}
-              </div>
+              </section>
 
-              {/* Webinars block */}
-              <div className="rounded-2xl p-4 border" style={{ borderColor: theme.border, background: theme.bg }}>
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-base font-semibold" style={{ color: theme.heading }}><T>Бесплатные вебинары</T></div>
-                    <div className="text-xs mt-1" style={{ color: theme.text }}>
-                      <T>Регулярные открытые эфиры с преподавателями и командами программ: формат, учебный план, ответы на вопросы. Бесплатно, запись присылаем после эфира.</T>
-                    </div>
-                  </div>
-                  <button onClick={() => { haptic.light(); openUrl(SETTINGS.webinars_url); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: theme.chip2, color: '#000000' }}>
-                    <T>Открыть календарь вебинаров</T>
-                  </button>
-                </div>
-              </div>
-
-              {/* Telegram channel block */}
-              <div className="rounded-2xl p-4 border text-center" style={{ borderColor: theme.border, background: theme.bg }}>
-                <div className="text-base font-semibold mb-1" style={{ color: theme.heading }}><T>Подписывайтесь на Telegram-канал</T></div>
-                <div className="text-xs mb-3" style={{ color: theme.text }}><T>Следите за новостями, обновлениями программ и бесплатными мероприятиями.</T></div>
-                <button onClick={() => { haptic.light(); openTelegram(`https://t.me/${SETTINGS.telegram_channel.replace('@', '')}`); }} className="px-4 py-2 rounded-xl text-sm" style={{ background: BRAND.primary, color: 'white' }}>
-                  <T>Перейти в канал {SETTINGS.telegram_channel}</T>
-                </button>
-              </div>
-
-              {/* Footer */}
-              <div className="pt-6 pb-[calc(40px+var(--sab))] text-center text-xs" style={{ color: theme.text }}>
-                <T>Информация, размещённая в приложении, не является публичной офертой. Актуальные условия обучения, стоимость и документы об образовании уточняйте у менеджера.</T>
-                <div className="mt-2"><T>ООО «Нетология» · ИНН: {SETTINGS.legal.inn} · Адрес: {SETTINGS.legal.address}</T></div>
-              </div>
-            </div>
+              <footer className="text-center text-xs opacity-80 mt-8">
+                Информация не является публичной офертой. Уточняйте условия у менеджера.
+              </footer>
+            </main>
           </div>
         );
       }
 
-      const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(<App />);
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
   </body>
 </html>

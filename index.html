@@ -3,186 +3,214 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Нетология ДПО — Telegram Mini-app (Liquid Glass)</title>
+  <title>Нетология ДПО — Telegram Mini-app</title>
 
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
-  <!-- Tailwind (CDN) -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- React 18 UMD -->
+  <!-- React 18 -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <!-- Babel for JSX (dev only) -->
+  <!-- Babel (dev) -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    :root { --sab: env(safe-area-inset-bottom); }
-
-    /* Base backgrounds for light/dark */
-    body{background:var(--tg-theme-secondary-bg-color,#f5f7fb);}
-    @media (prefers-color-scheme:dark){
-      body{background:var(--tg-theme-secondary-bg-color, #0e1115);}
+    :root{
+      --sab: env(safe-area-inset-bottom);
+      --sat: env(safe-area-inset-top);
+      --app-vh: 100vh; /* перепишем из JS на tg.viewportStableHeight */
     }
 
-    /* Liquid-glass surfaces */
+    /* База свет/тёмная */
+    body{
+      margin:0;
+      padding:0;
+      color: var(--tg-theme-text-color, #1b1e22);
+      background: var(--tg-theme-secondary-bg-color, #f6f7f9);
+      min-height: calc(var(--app-vh));
+    }
+    @media (prefers-color-scheme: dark){
+      body{ background: var(--tg-theme-secondary-bg-color, #0e1115); color: var(--tg-theme-text-color, #e9edf1); }
+    }
+
+    /* Стеклянные поверхности */
     .glass{
-      background:rgba(255,255,255,.55);
-      -webkit-backdrop-filter:blur(18px) saturate(140%);
-      backdrop-filter:blur(18px) saturate(140%);
-      border:1px solid rgba(255,255,255,.28);
+      background: rgba(255,255,255,.58);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+      backdrop-filter: blur(18px) saturate(140%);
+      border: 1px solid rgba(0,0,0,.04);
     }
     .glass-strong{
-      background:rgba(255,255,255,.72);
-      -webkit-backdrop-filter:blur(22px) saturate(160%);
-      backdrop-filter:blur(22px) saturate(160%);
-      border:1px solid rgba(255,255,255,.32);
+      background: rgba(255,255,255,.72);
+      -webkit-backdrop-filter: blur(22px) saturate(160%);
+      backdrop-filter: blur(22px) saturate(160%);
+      border: 1px solid rgba(0,0,0,.05);
     }
-    @media (prefers-color-scheme:dark){
-      .glass{ background:rgba(20,22,26,.55); border-color:rgba(255,255,255,.1); }
-      .glass-strong{ background:rgba(26,29,34,.72); border-color:rgba(255,255,255,.12); }
+    @media (prefers-color-scheme: dark){
+      .glass{ background: rgba(20,22,26,.55); border-color: rgba(255,255,255,.10); }
+      .glass-strong{ background: rgba(26,29,34,.70); border-color: rgba(255,255,255,.12); }
     }
 
-    /* Press effect */
-    .pressable{ transition:transform .08s ease, filter .18s ease; }
-    .pressable:active{ transform:translateY(1px) scale(.996); filter:saturate(1.05); }
+    .pressable{ transition: transform .08s ease, filter .18s ease; }
+    .pressable:active{ transform: translateY(1px) scale(.996); filter: saturate(1.05); }
 
-    /* Sticky first column */
-    .table-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    /* Сравнение: всегда таблица, скролл по X + липкий первый столбец с тенюхой */
+    .table-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom: 6px; }
     .sticky-first th:first-child, .sticky-first td:first-child{
-      position:sticky; left:0; z-index:2; backdrop-filter:blur(10px);
-      background:rgba(255,255,255,.85);
+      position: sticky; left: 0; z-index: 2;
+      background: rgba(255,255,255,.9);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+      box-shadow: 6px 0 12px -6px rgba(0,0,0,.08);
     }
-    @media (prefers-color-scheme:dark){
-      .sticky-first th:first-child, .sticky-first td:first-child{ background:rgba(18,20,24,.8); }
+    @media (prefers-color-scheme: dark){
+      .sticky-first th:first-child, .sticky-first td:first-child{
+        background: rgba(18,20,24,.88);
+        box-shadow: 6px 0 12px -6px rgba(0,0,0,.5);
+      }
     }
   </style>
 </head>
-<body class="min-h-screen">
+<body>
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useEffect, useMemo, useState, useRef } = React;
+    const {useEffect, useMemo, useRef, useState} = React;
 
-    /* ========= Brand & settings ========= */
-    const BRAND = {
-      g1: "#A0E9FF",
-      g2: "#00D2FF",
-      g3: "#24B6FF",
-      primary: "#00D2FF",
-    };
+    /* ===== Runtime layout fix for Telegram full-screen ===== */
+    (function setupVH(){
+      const tg = window?.Telegram?.WebApp;
+      const set = ()=>{
+        const h = tg?.viewportStableHeight || window.innerHeight;
+        document.documentElement.style.setProperty('--app-vh', h + 'px');
+      };
+      set();
+      window.addEventListener('resize', set);
+      tg?.onEvent?.('viewportChanged', set);
+    })();
 
+    /* ===== Brand / Settings ===== */
+    const BRAND = { g2: '#00D2FF', g3: '#24B6FF' };
     const SETTINGS = {
-      manager: { tg_username: "@netology_vo" },
-      webinars_url: "https://netology.ru/free/degree",
-      telegram_channel: "@netology_degree",
-      logoSvg: `<?xml version="1.0" encoding="UTF-8"?><svg width="148" height="22" viewBox="0 0 150 22" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#c)"><path d="M29.57 4.686h3.151v4.884h5.394V4.686h3.151V17.314h-3.151v-5.123H32.72v5.123H29.57V4.686Z" fill="currentColor"/><path d="M49.866 17.6c-.86 0-1.679-.127-2.459-.381-.763-.27-1.432-.667-2.005-1.191-.573-.54-1.026-1.215-1.36-2.025-.334-.826-.501-1.787-.501-2.883v-.477c0-1.048.159-1.962.477-2.74.318-.778.756-1.421 1.313-1.93.557-.524 1.201-.913 1.933-1.167.732-.27 1.52-.405 2.363-.405 1.989 0 3.501.524 4.535 1.572 1.034 1.049 1.552 2.566 1.552 4.551v1.334H46.764c.016.556.111 1.04.286 1.453.175.397.406.723.692.977.287.254.613.445.979.572.381.112.763.167 1.145.167.812 0 1.424-.119 1.837-.357.413-.238.707-.587.882-1.048h2.888c-.255 1.318-.883 2.311-1.886 2.978-.001 0-1.242.333-2.722.333Z" fill="currentColor"/><path d="M60.83 7.307h-4.034V4.686H68.014v2.621H63.98v10.007H60.83V7.307Z" fill="currentColor"/><path d="M75.413 17.6c-.859 0-1.679-.127-2.458-.381-.763-.27-1.432-.675-2.005-1.215-.573-.54-1.026-1.215-1.36-2.025-.334-.81-.501-1.764-.501-2.86v-.477c0-1.032.167-1.938.501-2.716.334-.778.787-1.429 1.36-1.953.573-.524 1.242-.913 2.005-1.167.78-.27 1.599-.405 2.458-.405s1.87.135 2.634.405c.763.27 1.432.659 2.005 1.167.589.524 1.05 1.175 1.384 1.953.334.778.501 1.684.501 2.716v.477c0 1.08-.167 2.025-.501 2.835-.334.81-.795 1.476-1.384 1.996-.573.54-1.242.944-2.005 1.215-.764.27-1.582.405-2.442.405Z" fill="currentColor"/><path d="M83.883 17.6c-.127 0-.286-.008-.477-.024-.191 0-.35-.016-.477-.048v-2.835c.08.016.199.024.358.024.302 0 .564-.087.787-.262.223-.19.406-.507.549-.952.159-.444.27-1.033.334-1.763.08-.747.119-1.668.119-2.764V4.686h10.025V17.314H91.95V7.307h-3.962v2.144c0 1.636-.087 2.986-.262 4.05-.159 1.048-.414 1.875-.764 2.478-.334.603-.764 1.024-1.289 1.262-.509.238-1.106.359-1.792.359Z" fill="currentColor"/><path d="M103.687 17.6c-.859 0-1.679-.127-2.458-.381-.764-.27-1.432-.675-2.005-1.215-.573-.54-1.027-1.215-1.361-2.025-.334-.81-.5-1.764-.5-2.86v-.477c0-1.032.166-1.938.5-2.716.334-.778.788-1.429 1.361-1.953.573-.524 1.241-.913 2.005-1.167.779-.27 1.599-.405 2.458-.405.859 0 1.671.135 2.435.405.764.27 1.432.659 2.005 1.167.589.524 1.05 1.175 1.384 1.953.334.778.501 1.684.501 2.716v.477c0 1.08-.167 2.025-.501 2.835-.334.81-.795 1.476-1.384 1.996-.573.54-1.241.944-2.005 1.215-.764.27-1.582.405-2.442.405Z" fill="currentColor"/><path d="M112.509 4.686h9.07v2.621h-5.919v10.007h-3.151V4.686Z" fill="currentColor"/><path d="M123.482 4.686h3.151v8.101l5.633-8.101h2.912V17.314h-3.151V9.213l-5.633 8.101h-2.912V4.686Z" fill="currentColor"/><path d="M140.604 12.573c-.97-.317-1.678-.794-2.124-1.429-.445-.636-.667-1.382-.667-2.239 0-.62.104-1.183.31-1.691.223-.525.549-.97.979-1.335.43-.381.971-.675 1.623-.881.668-.206 1.448-.31 2.339-.31h5.967v12.628h-3.151v-4.36h-2.267l-2.745 4.36h-3.533l2.958-4.742Zm.358-3.669c0 .54.175.937.526 1.191.366.254.85.381 1.456.381h2.935V7.307h-2.935c-.605 0-1.089.135-1.456.405-.351.254-.526.62-.526 1.191Z" fill="currentColor"/><path d="M6.214 11.512c.144 0 .286.007.427.019 0 0 .3 2.447 2.774 2.647.028.216.044.436.044.66 0 2.896-2.347 5.244-5.244 5.244S.97 17.733.97 14.836s2.348-5.244 5.244-5.244Z" fill="currentColor"/><path d="M6.214 0c2.896 0 5.244 2.348 5.244 5.244 0 .135-.007.269-.017.401C8.864 5.84 6.81 7.895 6.615 10.471c-.132.01-.265.017-.4.017C3.318 10.488.97 8.14.97 5.244.97 2.348 3.318 0 6.214 0Z" fill="currentColor"/><path d="M17.726 0c2.896 0 5.244 2.348 5.244 5.244 0 2.897-2.348 5.244-5.244 5.244-.223 0-.442-.016-.658-.043-.2-2.478-2.121-4.469-4.567-4.775-.011-.14-.018-.282-.018-.425 0-2.896 2.348-5.244 5.244-5.244Z" fill="currentColor"/><path d="M17.726 11.512c2.896 0 5.244 2.347 5.244 5.244 0 2.896-2.348 5.244-5.244 5.244-2.896 0-5.244-2.348-5.244-5.244 0-.233.017-.462.045-.687 2.348-.307 4.206-2.164 4.512-4.512.225-.03.454-.045.687-.045Z" fill="currentColor"/></g><defs><clipPath id="c"><rect width="148.06" height="22" fill="#fff" transform="translate(.97)"/></clipPath></defs></svg>`,
+      manager: { tg_username: '@netology_vo' },
+      webinars_url: 'https://netology.ru/free/degree',
+      telegram_channel: '@netology_degree',
+      // твой актуальный SVG, перекрашен на currentColor, чтобы работать в dark
+      logoSvg: `<svg width="139" height="21" viewBox="0 0 139 21" xmlns="http://www.w3.org/2000/svg" fill="none">
+        <g fill="currentColor">
+          <path d="M4.93457 10.832C5.06997 10.832 5.20427 10.8389 5.33691 10.8496C5.62497 13.1513 7.498 14.9586 9.8291 15.1475C9.85457 15.3506 9.87012 15.5576 9.87012 15.7676C9.86997 18.4929 7.65991 20.7021 4.93457 20.7021C2.20935 20.702 0.000148475 18.4928 0 15.7676C2.70757e-07 13.0422 2.20926 10.8322 4.93457 10.832Z"/>
+          <path d="M4.93457 0C7.65987 0 9.8699 2.20932 9.87012 4.93457C9.87012 5.06098 9.86285 5.18652 9.85352 5.31055C7.42987 5.49485 5.49668 7.42956 5.31348 9.85352C5.18846 9.86301 5.06202 9.87012 4.93457 9.87012C2.20926 9.86997 0 7.65991 0 4.93457C0.00021228 2.20941 2.20939 0.000143085 4.93457 0Z"/>
+          <path d="M15.7705 0C18.4959 0 20.7049 2.20926 20.7051 4.93457C20.7051 7.66 18.4959 9.87012 15.7705 9.87012C15.56 9.87011 15.353 9.8537 15.1494 9.82812C14.9611 7.49666 13.1543 5.62437 10.8525 5.33594C10.8419 5.20362 10.8359 5.06963 10.8359 4.93457C10.8361 2.20928 13.0452 0.0000437421 15.7705 0Z"/>
+          <path d="M15.7705 10.832C18.4959 10.832 20.7051 13.0421 20.7051 15.7676C20.7049 18.4928 18.4958 20.7021 15.7705 20.7021C13.0452 20.7021 10.8362 18.4928 10.8359 15.7676C10.8359 15.5485 10.8512 15.3326 10.8789 15.1211C13.088 14.8321 14.8358 13.0843 15.124 10.875C15.3356 10.8473 15.5514 10.832 15.7705 10.832Z"/>
+          <path d="M27.2109 4.40968H30.1593V9.00602H35.2074V4.40968H38.1558V16.2929H35.2074V11.4724H30.1593V16.2929H27.2109V4.40968Z"/>
+          <path d="M46.2047 16.562C45.4006 16.562 44.6338 16.4424 43.9041 16.2032C43.1893 15.9491 42.5639 15.5754 42.0278 15.0822C41.4918 14.574 41.0674 13.9387 40.7547 13.1764C40.442 12.3991 40.2856 11.4948 40.2856 10.4634V10.015C40.2856 9.02844 40.4345 8.16897 40.7323 7.43654C41.0301 6.70411 41.4396 6.09874 41.9608 5.62042C42.482 5.12716 43.0851 4.76095 43.7701 4.52179C44.4551 4.26768 45.1922 4.14062 45.9814 4.14062C47.8428 4.14062 49.2574 4.63389 50.2253 5.62042C51.1932 6.60696 51.6772 8.03444 51.6772 9.90287V11.1585H43.301C43.3159 11.6816 43.4053 12.1375 43.5691 12.5261C43.7329 12.8998 43.9488 13.2063 44.2168 13.4454C44.4848 13.6846 44.7901 13.8639 45.1326 13.9835C45.49 14.0882 45.8474 14.1405 46.2047 14.1405C46.9642 14.1405 47.5375 14.0284 47.9247 13.8042C48.3118 13.5799 48.5873 13.2511 48.7511 12.8176H51.4538C51.2156 14.0583 50.6274 14.9925 49.6892 15.6203C48.7511 16.2481 47.5896 16.562 46.2047 16.562ZM46.0931 6.56211C45.7506 6.56211 45.4081 6.60696 45.0656 6.69664C44.738 6.78632 44.4476 6.92833 44.1945 7.12264C43.9413 7.31696 43.7329 7.57854 43.5691 7.90738C43.4053 8.23623 43.3159 8.63234 43.301 9.09571H48.8181C48.8032 8.60244 48.7213 8.19139 48.5724 7.86254C48.4384 7.5337 48.2448 7.27212 47.9917 7.0778C47.7534 6.88348 47.4705 6.74896 47.1429 6.67422C46.8153 6.59948 46.4653 6.56211 46.0931 6.56211Z"/>
+          <path d="M56.4641 6.87601H52.6893V4.40968H63.1874V6.87601H59.4126V16.2929H56.4641V6.87601Z"/>
+          <path d="M70.1117 16.562C69.3076 16.562 68.5407 16.4424 67.811 16.2032C67.0963 15.9491 66.4709 15.568 65.9348 15.0597C65.3987 14.5515 64.9743 13.9163 64.6616 13.1539C64.3489 12.3916 64.1926 11.4948 64.1926 10.4634V10.015C64.1926 9.04339 64.3489 8.19139 64.6616 7.45896C64.9743 6.72654 65.3987 6.11369 65.9348 5.62042C66.4709 5.12716 67.0963 4.76095 67.811 4.52179C68.5407 4.26768 69.3076 4.14062 70.1117 4.14062C70.9158 4.14062 71.6753 4.26768 72.39 4.52179C73.1048 4.76095 73.7302 5.12716 74.2663 5.62042C74.8172 6.11369 75.2491 6.72654 75.5618 7.45896C75.8745 8.19139 76.0309 9.04339 76.0309 10.015V10.4634C76.0309 11.4798 75.8745 12.3692 75.5618 13.1315C75.2491 13.8938 74.8172 14.5291 74.2663 15.0373C73.7302 15.5455 73.1048 15.9267 72.39 16.1808C71.6753 16.4349 70.9158 16.562 70.1117 16.562ZM70.1117 14.0508C70.9456 14.0508 71.638 13.7518 72.189 13.1539C72.7548 12.556 73.0378 11.6592 73.0378 10.4634V10.015C73.0378 8.92381 72.7548 8.09423 72.189 7.52622C71.638 6.94327 70.9456 6.6518 70.1117 6.6518C69.2629 6.6518 68.563 6.94327 68.0121 7.52622C67.4611 8.09423 67.1856 8.92381 67.1856 10.015V10.4634C67.1856 11.6741 67.4611 12.5785 68.0121 13.1764C68.563 13.7593 69.2629 14.0508 70.1117 14.0508Z"/>
+          <path d="M78.0376 16.562C77.9185 16.562 77.7696 16.5545 77.5909 16.5395C77.4122 16.5395 77.2633 16.5246 77.1442 16.4947V13.8266C77.2186 13.8415 77.3303 13.849 77.4792 13.849C77.7622 13.849 78.0079 13.7668 78.2163 13.6024C78.4248 13.423 78.5961 13.124 78.7301 12.7055C78.879 12.287 78.9832 11.7339 79.0428 11.0464C79.1172 10.3438 79.1545 9.47687 79.1545 8.44549V4.40968H88.5358V16.2929H85.5874V6.87601H81.8795V8.89392C81.8795 10.4335 81.7976 11.704 81.6338 12.7055C81.4849 13.6921 81.2466 14.4693 80.919 15.0373C80.6063 15.6053 80.2043 16.0014 79.7129 16.2256C79.2364 16.4499 78.678 16.562 78.0376 16.562Z"/>
+          <path d="M96.5708 16.562C95.7667 16.562 94.9998 16.4424 94.2701 16.2032C93.5554 15.9491 92.9299 15.568 92.3939 15.0597C91.8578 14.5515 91.4334 13.9163 91.1207 13.1539C90.808 12.3916 90.6516 11.4948 90.6516 10.4634V10.015C90.6516 9.04339 90.808 8.19139 91.1207 7.45896C91.4334 6.72654 91.8578 6.11369 92.3939 5.62042C92.9299 5.12716 93.5554 4.76095 94.2701 4.52179C94.9998 4.26768 95.7667 4.14062 96.5708 4.14062C97.3749 4.14062 98.1343 4.26768 98.8491 4.52179C99.5638 4.76095 100.189 5.12716 100.725 5.62042C101.276 6.11369 101.708 6.72654 102.021 7.45896C102.334 8.19139 102.49 9.04339 102.49 10.015V10.4634C102.49 11.4798 102.334 12.3692 102.021 13.1315C101.708 13.8938 101.276 14.5291 100.725 15.0373C100.189 15.5455 99.5638 15.9267 98.8491 16.1808C98.1343 16.4349 97.3749 16.562 96.5708 16.562ZM96.5708 14.0508C97.4047 14.0508 98.0971 13.7518 98.6481 13.1539C99.2139 12.556 99.4968 11.6592 99.4968 10.4634V10.015C99.4968 8.92381 99.2139 8.09423 98.6481 7.52622C98.0971 6.94327 97.4047 6.6518 96.5708 6.6518C95.722 6.6518 95.0221 6.94327 94.4711 7.52622C93.9202 8.09423 93.6447 8.92381 93.6447 10.015V10.4634C93.6447 11.6741 93.9202 12.5785 94.4711 13.1764C95.0221 13.7593 95.722 14.0508 96.5708 14.0508Z"/>
+          <path d="M104.827 4.40968H113.314V6.87601H107.775V16.2929H104.827V4.40968Z"/>
+          <path d="M115.095 4.40968H118.044V12.0329L123.315 4.40968H126.04V16.2929H123.092V8.66971L117.82 16.2929H115.095V4.40968Z"/>
+          <path d="M131.118 11.8311C130.21 11.5321 129.547 11.0837 129.13 10.4858C128.713 9.88792 128.505 9.18539 128.505 8.37823C128.505 7.79528 128.602 7.26464 128.795 6.78633C129.004 6.29306 129.309 5.87453 129.711 5.53074C130.113 5.172 130.619 4.89547 131.23 4.70116C131.855 4.50684 132.585 4.40968 133.419 4.40968H139.003V16.2929H136.055V12.1898H133.933L131.364 16.2929H128.058L131.118 11.8311ZM131.453 8.37823C131.453 8.88644 131.617 9.26013 131.945 9.49929C132.287 9.73845 132.741 9.85803 133.307 9.85803H136.055V6.87601H133.307C132.741 6.87601 132.287 7.00306 131.945 7.25717C131.617 7.49633 131.453 7.87002 131.453 8.37823Z"/>
+        </g>
+      </svg>`
     };
 
-    const getTG = () => (typeof window !== 'undefined' ? window?.Telegram?.WebApp : undefined);
-    const openUrl = (url) => {
-      const tg = getTG();
-      if (tg?.openLink) tg.openLink(url, { try_instant_view: false });
-      else window.open(url, '_blank', 'noopener,noreferrer');
-    };
-    const openTelegram = (usernameOrUrl) => {
-      const tg = getTG();
-      const link = usernameOrUrl.startsWith("http") ? usernameOrUrl : `https://t.me/${usernameOrUrl.replace('@','')}`;
-      if (tg?.openTelegramLink) tg.openTelegramLink(link); else window.open(link, '_blank', 'noopener,noreferrer');
+    /* ===== TG helpers ===== */
+    const getTG = () => window?.Telegram?.WebApp;
+    const openUrl = (url)=>{ const tg=getTG(); if(tg?.openLink) tg.openLink(url,{try_instant_view:false}); else window.open(url,'_blank','noopener'); };
+    const openTelegram = (usernameOrUrl)=>{
+      const link = usernameOrUrl.startsWith('http') ? usernameOrUrl : `https://t.me/${usernameOrUrl.replace('@','')}`;
+      const tg=getTG(); if(tg?.openTelegramLink) tg.openTelegramLink(link); else window.open(link,'_blank','noopener');
     };
 
-    const haptic = {
-      light: () => getTG()?.HapticFeedback?.impactOccurred?.('light'),
-      selection: () => getTG()?.HapticFeedback?.selectionChanged?.(),
-    };
-
-    function getThemeFromTG(){
+    /* ===== Theme ===== */
+    function getTheme(){
       const p = getTG()?.themeParams || {};
       const dark = getTG()?.colorScheme === 'dark';
       return {
         dark,
-        heading: p.text_color || (dark ? '#FFFFFF' : '#0b0b0b'),
-        text:    p.text_color || (dark ? '#ECECEC' : '#1b1e22'),
-        border:  p.section_separator_color || (dark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)'),
-        panel:   dark ? 'rgba(20,22,26,.55)' : 'rgba(255,255,255,.55)',
+        text: p.text_color || (dark ? '#e9edf1' : '#1b1e22'),
+        heading: p.text_color || (dark ? '#ffffff' : '#0b0d10'),
+        border: p.section_separator_color || (dark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)'),
+        panel: dark ? 'rgba(20,22,26,.55)' : 'rgba(255,255,255,.58)',
+        strong: dark ? 'rgba(26,29,34,.70)' : 'rgba(255,255,255,.72)',
+        gradient: `linear-gradient(90deg, ${BRAND.g2}, ${BRAND.g3})`,
       };
     }
-    function useTelegramTheme(){
-      const [theme, setTheme] = useState(getThemeFromTG());
+    function useTGTheme(){
+      const [theme,setTheme]=useState(getTheme());
       useEffect(()=>{
-        const tg = getTG();
-        const onChange = ()=> setTheme(getThemeFromTG());
-        tg?.onEvent?.('themeChanged', onChange);
-        return ()=> tg?.offEvent?.('themeChanged', onChange);
+        const tg=getTG(); const upd=()=>setTheme(getTheme());
+        tg?.onEvent?.('themeChanged', upd); return ()=>tg?.offEvent?.('themeChanged', upd);
       },[]);
       return theme;
     }
 
-    /* ========= Data (сокращённо; можешь расширить) ========= */
+    /* ===== Data (пример) ===== */
     const PROGRAMS = [
       {
-        id: 'dpo-python-mfti',
-        title: 'Python: от кода к стартапу',
-        partners: ['МФТИ'],
-        start_date: '2025-10-20',
-        duration_months_est: 7,
-        price_full_rub: 158400,
-        price_from_per_month_rub: 6947,
-        landing_url: 'https://netology.ru/programs/razrabotchik-na-python-s-mfti',
-        audience: [
-          'Новичкам, которые хотят войти в разработку на Python',
-          'Аналитикам и инженерам для автоматизации задач',
-          'Специалистам смежных ролей (QA, DevOps, BI)',
+        id:'py',
+        title:'Python: от кода к стартапу',
+        partners:['МФТИ'],
+        start_date:'2025-10-20',
+        duration_months_est:7,
+        price_full_rub:158400,
+        price_from_per_month_rub:6947,
+        landing_url:'https://netology.ru/programs/razrabotchik-na-python-s-mfti',
+        audience:[
+          'Новичкам для входа в разработку',
+          'Аналитикам/инженерам для автоматизации',
+          'QA/DevOps/BI — усилить кодинг'
         ],
-        diploma: 'Два диплома о профпереподготовке: МФТИ и Нетологии',
-        learn: ['Python, API, БД', 'Web/боты/деплой', 'Проект от идеи до MVP'],
-        about: 'Путь от базового кода до работающего прототипа и питча.',
+        diploma:'Два диплома о профпереподготовке: МФТИ и Нетологии',
+        learn:['Python, API, БД','Web/боты/деплой','Проект: от идеи до MVP'],
+        about:'Путь от базового кода до работающего MVP и питча.'
       },
       {
-        id: 'dpo-ai-pm-mfti',
-        title: 'Руководитель проектов в области ИИ',
-        partners: ['МФТИ'],
-        start_date: '2025-12-08',
-        duration_months_est: 3,
-        price_full_rub: 114700,
-        price_from_per_month_rub: 5031,
-        landing_url: 'https://netology.ru/programs/rukovoditel-proektov-v-oblasti-iskusstvennogo-intellekta-dpo-mfti',
-        audience: [
-          'Менеджерам и продактам, запускающим AI-инициативы',
+        id:'ai-pm',
+        title:'Руководитель проектов в области ИИ',
+        partners:['МФТИ'],
+        start_date:'2025-12-08',
+        duration_months_est:3,
+        price_full_rub:114700,
+        price_from_per_month_rub:5031,
+        landing_url:'https://netology.ru/programs/rukovoditel-proektov-v-oblasti-iskusstvennogo-intellekta-dpo-mfti',
+        audience:[
+          'Продактам и менеджерам AI-инициатив',
           'Руководителям, внедряющим ИИ',
-          'Координаторам ML/DS-команд',
+          'Координаторам ML/DS-команд'
         ],
-        diploma: 'Два удостоверения о повышении квалификации: МФТИ и Нетологии',
-        learn: ['Цикл AI-проекта', 'Оценка эффекта и рисков', 'Коммуникация бизнес ↔ ML'],
-        about: 'Системный менеджмент AI-проектов от постановки до релиза.',
-      },
+        diploma:'Два удостоверения о повышении квалификации: МФТИ и Нетологии',
+        learn:['Цикл AI-проекта и внедрение','Оценка эффекта и рисков','Коммуникация бизнес ↔ ML'],
+        about:'Системный менеджмент AI-проектов от постановки до релиза.'
+      }
     ];
+    const rub = n => new Intl.NumberFormat('ru-RU').format(n);
+    const dstr = s => new Date(s).toLocaleDateString('ru-RU',{day:'2-digit',month:'long',year:'numeric'});
 
-    const rub = (n)=> new Intl.NumberFormat('ru-RU').format(n);
-    const dstr = (s)=> new Date(s).toLocaleDateString('ru-RU', { day:'2-digit', month:'long', year:'numeric' });
+    /* ===== UI ===== */
+    const Chip = ({children}) => (
+      <span className="px-2 py-1 rounded-full text-[11px] leading-none glass">{children}</span>
+    );
 
-    /* ========= UI ========= */
     function LogoBrand(){
-      const tg = getTG();
-      const color = tg?.colorScheme === 'dark' ? '#FFFFFF' : '#000000';
+      const theme = useTGTheme(); // only to track color scheme
+      const color = getTG()?.colorScheme === 'dark' ? '#FFFFFF' : '#000000';
       return <span className="h-6 inline-flex items-center" style={{color}} dangerouslySetInnerHTML={{__html: SETTINGS.logoSvg}} />;
     }
 
-    function TopBar({ theme }){
-      const gradient = `linear-gradient(90deg, ${BRAND.g2}, ${BRAND.g3})`;
+    function TopBar({theme}){
       return (
-        <div className="sticky top-0 z-20" style={{ backdropFilter:'blur(6px) saturate(140%)' }}>
-          <div className="max-w-5xl mx-auto px-4 pt-[max(12px,env(safe-area-inset-top))] pb-3">
-            <div className="glass rounded-2xl px-3 py-2 pressable" style={{borderColor: theme.border}}>
+        <div className="sticky top-0 z-20" style={{backdropFilter:'blur(6px) saturate(140%)'}}>
+          <div className="max-w-5xl mx-auto px-4 pt-[calc(8px+var(--sat))] pb-3">
+            <div className="rounded-2xl px-3 py-2 pressable" style={{background: theme.panel, border:`1px solid ${theme.border}`}}>
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <LogoBrand />
-                </div>
+                <LogoBrand />
                 <button
                   className="px-3 py-1.5 rounded-xl text-sm text-white pressable"
-                  style={{ backgroundImage: gradient }}
-                  onClick={()=> openTelegram(SETTINGS.manager.tg_username)}
+                  style={{backgroundImage: theme.gradient}}
+                  onClick={()=>openTelegram(SETTINGS.manager.tg_username)}
                 >Написать менеджеру</button>
               </div>
             </div>
@@ -191,37 +219,35 @@
       );
     }
 
-    function Modal({ title, onClose, children, theme }){
-      // Swipe-to-close
+    function Modal({title, onClose, children, theme}){
       const sheetRef = useRef(null);
-      const startY = useRef(null); const delta = useRef(0);
+      // TG back button (optional)
       useEffect(()=>{
-        const tg = getTG();
-        const back = ()=> onClose?.();
-        try { tg?.BackButton?.show(); } catch {}
+        const tg=getTG(); const back=()=>onClose?.();
+        try{tg?.BackButton?.show();}catch{}
         tg?.onEvent?.('backButtonClicked', back);
-        return ()=> { try { tg?.BackButton?.hide(); } catch {} tg?.offEvent?.('backButtonClicked', back); };
+        return ()=>{try{tg?.BackButton?.hide();}catch{} tg?.offEvent?.('backButtonClicked', back);};
       },[onClose]);
-
+      // Swipe to close
       useEffect(()=>{
-        const el = sheetRef.current;
-        if(!el) return;
-        const onStart = (e)=>{ startY.current = (e.touches? e.touches[0].clientY : e.clientY); };
-        const onMove  = (e)=>{ if(startY.current==null) return; const y=(e.touches?e.touches[0].clientY:e.clientY); delta.current = Math.max(0, y - startY.current); el.style.transform = `translateY(${delta.current}px)`; el.style.opacity = `${Math.max(0.6, 1 - delta.current/600)}`; };
-        const onEnd   = ()=>{ if(delta.current > 80) onClose(); el.style.transform=''; el.style.opacity=''; startY.current=null; delta.current=0; };
-        el.addEventListener('touchstart', onStart, {passive:true});
-        el.addEventListener('touchmove', onMove, {passive:true});
-        el.addEventListener('touchend', onEnd);
-        el.addEventListener('mousedown', onStart);
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onEnd);
-        return ()=>{ el.removeEventListener('touchstart', onStart); el.removeEventListener('touchmove', onMove); el.removeEventListener('touchend', onEnd); el.removeEventListener('mousedown', onStart); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onEnd); };
+        const el=sheetRef.current; if(!el) return;
+        let startY=null, delta=0;
+        const onStart=e=>{startY=(e.touches?e.touches[0].clientY:e.clientY);};
+        const onMove=e=>{ if(startY==null) return; const y=(e.touches?e.touches[0].clientY:e.clientY); delta=Math.max(0,y-startY); el.style.transform=`translateY(${delta}px)`; el.style.opacity=String(Math.max(.65,1-delta/600)); };
+        const onEnd=()=>{ if(delta>80) onClose(); el.style.transform=''; el.style.opacity=''; startY=null; delta=0; };
+        el.addEventListener('touchstart',onStart,{passive:true});
+        el.addEventListener('touchmove',onMove,{passive:true});
+        el.addEventListener('touchend',onEnd);
+        el.addEventListener('mousedown',onStart);
+        window.addEventListener('mousemove',onMove);
+        window.addEventListener('mouseup',onEnd);
+        return ()=>{ el.removeEventListener('touchstart',onStart); el.removeEventListener('touchmove',onMove); el.removeEventListener('touchend',onEnd); el.removeEventListener('mousedown',onStart); window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onEnd); };
       },[onClose]);
 
       return (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
-          <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-          <div ref={sheetRef} className="relative w-full md:max-w-2xl md:rounded-3xl glass-strong md:shadow-2xl" style={{borderColor: theme.border}}>
+          <div className="absolute inset-0 bg-black/35" onClick={onClose} />
+          <div ref={sheetRef} className="relative w-full md:max-w-2xl md:rounded-3xl glass-strong md:shadow-2xl" style={{border:`1px solid ${theme.border}`}}>
             <div className="p-4 md:p-6">
               <div className="flex items-start justify-between gap-3">
                 <h3 className="text-lg font-semibold" style={{color: theme.heading}}>{title}</h3>
@@ -234,21 +260,14 @@
       );
     }
 
-    const Chip = ({children}) => (
-      <span className="px-2 py-1 rounded-full text-[11px] leading-none glass" style={{borderColor:'rgba(0,0,0,.08)'}}>
-        {children}
-      </span>
-    );
-
-    function ProgramCard({ p, onCompareToggle, selected, theme }){
-      const [open, setOpen] = useState(false);
-      const gradient = `linear-gradient(90deg, ${BRAND.g2}, ${BRAND.g3})`;
+    function ProgramCard({p, onCompareToggle, selected, theme}){
+      const [open,setOpen]=useState(false);
       return (
-        <div className="rounded-3xl p-4 md:p-5 pressable glass" style={{borderColor: theme.border}}>
+        <div className="rounded-3xl p-4 md:p-5 pressable" style={{background: theme.panel, border:`1px solid ${theme.border}`}}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-base md:text-lg font-semibold" style={{color: theme.heading}}>{p.title}</div>
-              <div className="mt-1 text-sm opacity-80" style={{color: theme.text}}>Партнёр: {p.partners.join(', ')}</div>
+              <div className="mt-1 text-sm opacity-85" style={{color: theme.text}}>Партнёр: {p.partners.join(', ')}</div>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 <Chip>Старт: {dstr(p.start_date)}</Chip>
                 <Chip>{p.duration_months_est} мес</Chip>
@@ -256,41 +275,37 @@
                 <Chip>от {rub(p.price_from_per_month_rub)} ₽/мес</Chip>
               </div>
             </div>
-            <button onClick={()=> onCompareToggle(p.id)} className={`px-3 py-2 rounded-xl text-xs md:text-sm glass ${selected?'font-semibold':''}`}>
-              {selected ? 'В сравнении' : 'Сравнить'}
-            </button>
+            <button onClick={()=>onCompareToggle(p.id)} className={`px-3 py-2 rounded-xl text-xs md:text-sm glass ${selected?'font-semibold':''}`}>{
+              selected?'В сравнении':'Сравнить'
+            }</button>
           </div>
 
           <div className="mt-4 flex gap-2">
-            <button className="flex-1 py-2 rounded-xl text-white pressable" style={{backgroundImage: gradient}} onClick={()=> openUrl(p.landing_url)}>Открыть программу</button>
-            <button className="flex-1 py-2 rounded-xl pressable glass" onClick={()=> setOpen(true)}>Подробнее</button>
+            <button className="flex-1 py-2 rounded-xl text-white pressable" style={{backgroundImage: theme.gradient}} onClick={()=>openUrl(p.landing_url)}>Открыть программу</button>
+            <button className="flex-1 py-2 rounded-xl pressable glass" onClick={()=>setOpen(true)}>Подробнее</button>
           </div>
 
           {open && (
-            <Modal title={p.title} onClose={()=> setOpen(false)} theme={theme}>
+            <Modal title={p.title} onClose={()=>setOpen(false)} theme={theme}>
               <div className="mt-2 text-sm opacity-90" style={{color: theme.text}}>{p.about}</div>
-
               <div className="mt-4">
                 <div className="text-sm font-medium" style={{color: theme.heading}}>Кому подойдёт</div>
                 <ul className="list-disc ml-5 mt-1 text-sm opacity-90 space-y-1" style={{color: theme.text}}>
                   {p.audience.map((a,i)=><li key={i}>{a}</li>)}
                 </ul>
               </div>
-
               <div className="mt-4">
                 <div className="text-sm font-medium" style={{color: theme.heading}}>Чему научитесь</div>
                 <ul className="list-disc ml-5 mt-1 text-sm opacity-90 space-y-1" style={{color: theme.text}}>
                   {p.learn.map((a,i)=><li key={i}>{a}</li>)}
                 </ul>
               </div>
-
               <div className="mt-4 text-sm opacity-90" style={{color: theme.text}}>
                 <span className="font-medium">Документ: </span>{p.diploma}
               </div>
-
               <div className="mt-5 flex flex-wrap gap-2">
-                <button className="px-4 py-2 rounded-xl text-white pressable" style={{backgroundImage: gradient}} onClick={()=> openUrl(p.landing_url)}>Перейти на сайт</button>
-                <button className="px-4 py-2 rounded-xl glass pressable" onClick={()=> openTelegram(SETTINGS.manager.tg_username)}>Написать менеджеру</button>
+                <button className="px-4 py-2 rounded-xl text-white pressable" style={{backgroundImage: theme.gradient}} onClick={()=>openUrl(p.landing_url)}>Перейти на сайт</button>
+                <button className="px-4 py-2 rounded-xl glass pressable" onClick={()=>openTelegram(SETTINGS.manager.tg_username)}>Написать менеджеру</button>
               </div>
             </Modal>
           )}
@@ -298,40 +313,38 @@
       );
     }
 
-    function CompareTable({ ids, onReset, theme }){
-      const data = PROGRAMS.filter(p => ids.includes(p.id));
-      if (!data.length) return null;
-
+    function CompareTable({ids,onReset,theme}){
+      const data = PROGRAMS.filter(p=>ids.includes(p.id));
+      if(!data.length) return null;
       return (
-        <div className="rounded-3xl p-4 glass" style={{borderColor: theme.border}}>
+        <div className="rounded-3xl p-4" style={{background: theme.panel, border:`1px solid ${theme.border}`}}>
           <div className="flex items-center justify-between">
             <div className="text-base font-semibold" style={{color: theme.heading}}>Сравнение программ</div>
             <button onClick={onReset} className="px-3 py-1.5 rounded-xl text-sm glass pressable">Сбросить</button>
           </div>
-
           <div className="table-scroll mt-3 rounded-2xl">
-            <table className="min-w-[760px] w-full text-sm leading-snug sticky-first">
+            <table className="min-w-[780px] w-full text-sm leading-snug sticky-first">
               <thead>
                 <tr className="text-left">
-                  <th className="py-2 pr-3 w-[28%]">Программа</th>
-                  <th className="py-2 pr-3 w-[16%]">Вуз-партнёр</th>
-                  <th className="py-2 pr-3 w-[12%]">Старт</th>
-                  <th className="py-2 pr-3 w-[12%]">Длительность</th>
-                  <th className="py-2 pr-3 w-[12%]">Цена</th>
-                  <th className="py-2 pr-3 w-[14%]">От ₽/мес</th>
-                  <th className="py-2 pr-3 w-[40%]">Навыки</th>
+                  <th className="pl-3 pr-3 py-2 w-[28%]">Программа</th>
+                  <th className="pr-3 py-2 w-[16%]">Вуз-партнёр</th>
+                  <th className="pr-3 py-2 w-[12%]">Старт</th>
+                  <th className="pr-3 py-2 w-[12%]">Длительность</th>
+                  <th className="pr-3 py-2 w-[12%]">Цена</th>
+                  <th className="pr-3 py-2 w-[14%]">От ₽/мес</th>
+                  <th className="pr-3 py-2 w-[42%]">Навыки</th>
                 </tr>
               </thead>
               <tbody>
                 {data.map(p=>(
                   <tr key={p.id} className="border-t" style={{borderColor: theme.border}}>
-                    <td className="py-2 pr-3 font-medium">{p.title}</td>
-                    <td className="py-2 pr-3">{p.partners.join(', ')}</td>
-                    <td className="py-2 pr-3">{dstr(p.start_date)}</td>
-                    <td className="py-2 pr-3">{p.duration_months_est} мес</td>
-                    <td className="py-2 pr-3">{rub(p.price_full_rub)} ₽</td>
-                    <td className="py-2 pr-3">{rub(p.price_from_per_month_rub)} ₽</td>
-                    <td className="py-2 pr-3 opacity-90">{p.learn.join(' · ')}</td>
+                    <td className="pl-3 pr-3 py-2 font-medium">{p.title}</td>
+                    <td className="pr-3 py-2">{p.partners.join(', ')}</td>
+                    <td className="pr-3 py-2">{dstr(p.start_date)}</td>
+                    <td className="pr-3 py-2">{p.duration_months_est} мес</td>
+                    <td className="pr-3 py-2">{rub(p.price_full_rub)} ₽</td>
+                    <td className="pr-3 py-2">{rub(p.price_from_per_month_rub)} ₽</td>
+                    <td className="pr-3 py-2 opacity-90">{p.learn.join(' · ')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -341,16 +354,16 @@
       );
     }
 
-    function IntroBlocks({ theme }){
+    function IntroBlocks({theme}){
       return (
         <div className="grid md:grid-cols-2 gap-3">
-          <div className="glass rounded-2xl p-4" style={{borderColor: theme.border}}>
+          <div className="rounded-2xl p-4 glass" style={{border:`1px solid ${theme.border}`}}>
             <div className="text-sm font-medium" style={{color: theme.heading}}>Что такое ДПО</div>
             <div className="mt-1 text-xs" style={{color: theme.text}}>
-              Краткие практические программы повышения квалификации или переподготовки. Итог: документ вуза-партнёра и документ Нетологии (диплом о профпереподготовке или удостоверение о повышении квалификации — зависит от программы).
+              Краткие практические программы повышения квалификации или переподготовки. Итог — документ вуза-партнёра и документ Нетологии (диплом о профпереподготовке или удостоверение о повышении квалификации — зависит от программы).
             </div>
           </div>
-          <div className="glass rounded-2xl p-4" style={{borderColor: theme.border}}>
+          <div className="rounded-2xl p-4 glass" style={{border:`1px solid ${theme.border}`}}>
             <div className="text-sm font-medium" style={{color: theme.heading}}>Формат</div>
             <div className="mt-1 text-xs" style={{color: theme.text}}>
               Онлайн, записи занятий, гибкий график. Рекомендованная нагрузка — 20–30 ч/нед.
@@ -360,28 +373,25 @@
       );
     }
 
-    function WebinarsAndTG({ theme }){
-      const gradient = `linear-gradient(90deg, ${BRAND.g2}, ${BRAND.g3})`;
+    function WebinarsAndTG({theme}){
       return (
         <>
-          <div className="glass rounded-2xl p-4" style={{borderColor: theme.border}}>
+          <div className="rounded-2xl p-4" style={{background: theme.panel, border:`1px solid ${theme.border}`}}>
             <div className="flex items-center justify-between gap-2">
               <div>
                 <div className="text-base font-semibold" style={{color: theme.heading}}>Бесплатные вебинары</div>
-                <div className="text-xs mt-1" style={{color: theme.text}}>
-                  Открытые эфиры с преподавателями: формат, учебный план, ответы на вопросы. Запись присылаем после эфира.
-                </div>
+                <div className="text-xs mt-1" style={{color: theme.text}}>Открытые эфиры: формат, учебный план, ответы на вопросы. Запись присылаем после эфира.</div>
               </div>
-              <button className="px-4 py-2 rounded-xl text-white pressable" style={{backgroundImage: gradient}} onClick={()=> openUrl(SETTINGS.webinars_url)}>
+              <button className="px-4 py-2 rounded-xl text-white pressable" style={{backgroundImage: `linear-gradient(90deg, ${BRAND.g2}, ${BRAND.g3})`}} onClick={()=>openUrl(SETTINGS.webinars_url)}>
                 Календарь
               </button>
             </div>
           </div>
 
-          <div className="glass rounded-2xl p-4 text-center" style={{borderColor: theme.border}}>
+          <div className="rounded-2xl p-4 text-center" style={{background: theme.panel, border:`1px solid ${theme.border}`}}>
             <div className="text-base font-semibold mb-1" style={{color: theme.heading}}>Подписывайтесь на Telegram-канал</div>
             <div className="text-xs mb-3" style={{color: theme.text}}>Новости, обновления программ и бесплатные мероприятия.</div>
-            <button className="px-4 py-2 rounded-xl text-white pressable" style={{backgroundImage: gradient}} onClick={()=> openTelegram(SETTINGS.telegram_channel)}>
+            <button className="px-4 py-2 rounded-xl text-white pressable" style={{backgroundImage: `linear-gradient(90deg, ${BRAND.g2}, ${BRAND.g3})`}} onClick={()=>openTelegram(SETTINGS.telegram_channel)}>
               Перейти в канал {SETTINGS.telegram_channel}
             </button>
           </div>
@@ -389,43 +399,42 @@
       );
     }
 
-    function Filters({ partner, setPartner, theme }){
+    function Filters({partner,setPartner,theme}){
       const partners = useMemo(()=>{
-        const set = new Set();
-        PROGRAMS.forEach(p=> p.partners.forEach(x=> set.add(x)));
-        return ['Все вузы', ...Array.from(set)];
+        const s=new Set(); PROGRAMS.forEach(p=>p.partners.forEach(x=>s.add(x)));
+        return ['Все вузы', ...Array.from(s)];
       },[]);
       return (
         <div className="flex gap-2">
-          <select value={partner} onChange={(e)=>{ haptic.selection(); setPartner(e.target.value); }} className="px-3 py-2 rounded-2xl glass w-full md:w-1/3" style={{borderColor: theme.border}}>
-            {partners.map(p=> <option key={p} value={p}>{p}</option>)}
+          <select value={partner} onChange={(e)=>setPartner(e.target.value)} className="px-3 py-2 rounded-2xl glass w-full md:w-1/3" style={{border:`1px solid ${theme.border}`}}>
+            {partners.map(p=><option key={p} value={p}>{p}</option>)}
           </select>
         </div>
       );
     }
 
     function App(){
-      const [partner, setPartner] = useState('Все вузы');
-      const [compareIds, setCompareIds] = useState([]);
-      const theme = useTelegramTheme();
+      const theme = useTGTheme();
+      const [partner,setPartner]=useState('Все вузы');
+      const [compareIds,setCompareIds]=useState([]);
 
       useEffect(()=>{
-        const tg = getTG();
-        if (tg){
-          try{ tg.ready(); tg.expand?.(); tg.setHeaderColor?.('bg_color'); tg.setBackgroundColor?.('secondary_bg_color'); }catch{}
-        }
+        const tg=getTG();
+        if(tg){ try{ tg.ready(); tg.expand?.(); tg.setHeaderColor?.('bg_color'); tg.setBackgroundColor?.('secondary_bg_color'); }catch{} }
       },[]);
 
-      const filtered = useMemo(()=> PROGRAMS.filter(p=> partner==='Все вузы' || p.partners.includes(partner)), [partner]);
-      const toggleCompare = (id)=> setCompareIds(prev => (prev.includes(id)? prev.filter(x=>x!==id) : [...prev, id].slice(-4)));
+      const filtered = useMemo(()=> PROGRAMS.filter(p=>partner==='Все вузы' || p.partners.includes(partner)), [partner]);
+      const toggleCompare = id => setCompareIds(prev => (prev.includes(id) ? prev.filter(x=>x!==id) : [...prev, id].slice(-4)));
 
       return (
-        <div className="min-h-screen">
+        <div style={{minHeight:'calc(var(--app-vh))', paddingBottom:'calc(16px + var(--sab))'}}>
           <TopBar theme={theme} />
-          <main className="max-w-5xl mx-auto px-4 pb-[calc(40px+var(--sab))]">
-            <header className="pt-3 pb-2">
+          <main className="max-w-5xl mx-auto px-4">
+            <header className="pt-2 pb-2">
               <h1 className="text-lg md:text-xl font-semibold" style={{color: theme.heading}}>Программы ДПО с дипломом вуза</h1>
-              <p className="mt-1 text-sm md:text-base" style={{color: theme.text}}>Карточки — лёгкие; подробности — в модалке. Палитра и градиенты — как у Нетологии.</p>
+              <p className="mt-1 text-sm md:text-base" style={{color: theme.text}}>
+                Карточки — лёгкие; подробности — в модалке. Цвета и градиент как у Нетологии.
+              </p>
             </header>
 
             <IntroBlocks theme={theme} />
@@ -435,11 +444,11 @@
             </section>
 
             <section className="mt-4">
-              <CompareTable ids={compareIds} onReset={()=> setCompareIds([])} theme={theme} />
+              <CompareTable ids={compareIds} onReset={()=>setCompareIds([])} theme={theme} />
             </section>
 
             <section className="mt-4 grid gap-3">
-              {filtered.map(p => (
+              {filtered.map(p=>(
                 <ProgramCard key={p.id} p={p} onCompareToggle={toggleCompare} selected={compareIds.includes(p.id)} theme={theme} />
               ))}
             </section>
@@ -448,8 +457,8 @@
               <WebinarsAndTG theme={theme} />
             </section>
 
-            <footer className="pt-6 pb-[calc(40px+var(--sab))] text-center text-xs" style={{color: theme.text}}>
-              Информация в приложении не является публичной офертой. Уточняйте условия у менеджера.
+            <footer className="text-center text-xs opacity-80 mt-8" style={{color: theme.text}}>
+              Информация не является публичной офертой. Актуальные условия уточняйте у менеджера.
             </footer>
           </main>
         </div>

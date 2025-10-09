@@ -50,12 +50,63 @@
     .pressable{transition:.08s transform ease,.18s filter ease}
     .pressable:active{transform:translateY(1px) scale(.996);filter:saturate(1.05)}
 
-    /* bottom sheet */
-    .sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:1000;opacity:0;pointer-events:none;transition:opacity .18s ease}
-    .sheet{position:fixed;left:0;right:0;bottom:0;z-index:1001;transform:translateY(100%);transition:transform .24s cubic-bezier(.2,.8,.2,1)}
-    .sheet-open .sheet-overlay{opacity:1;pointer-events:auto}
-    .sheet-open .sheet{transform:translateY(0)}
-    .sheet-body{padding:14px 16px calc(16px + var(--sab))}
+/* bottom sheet */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease;
+}
+.sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  transform: translateY(100%);
+  transition: transform .24s cubic-bezier(.2,.8,.2,1);
+}
+.sheet-open .sheet-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sheet-open .sheet {
+  transform: translateY(0);
+}
+
+/* контейнер шита */
+.sheet-container {
+  max-height: calc(var(--app-vh) - calc(24px + var(--sat)));
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* шапка и тело со скроллом */
+.sheet-header {
+  padding: 8px 12px 0 12px;
+  flex: 0 0 auto;
+}
+.sheet-body {
+  padding: 12px 16px calc(16px + var(--sab));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto;
+}
+
+/* компактный текст */
+.modal-typo p, .modal-typo li {
+  line-height: 1.3;
+}
+.modal-typo ul {
+  margin-top: 6px;
+}
+
 
     /* compare table */
     .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px}
@@ -136,10 +187,10 @@
     if(ctx==='discount') return 'Здравствуйте! Хочу получить скидку 10 000 ₽ на курс. Подскажите, как это сделать?';
     return `Здравствуйте! Меня заинтересовала программа «${title}». Расскажите, пожалуйста, подробнее.`;
   }
-  function managerLink(ctx, title=''){
-    const user = SETTINGS.manager.tg_username.replace('@','');
-    const enc  = encodeURIComponent(buildText(ctx,title)).replace(/%20/g,'+');
-    return `https://t.me/${user}?text=${enc}`;
+ function managerLink(ctx, title=''){
+  const user = SETTINGS.manager.tg_username.replace('@','');
+  const enc  = encodeURIComponent(buildText(ctx,title)); // оставляем %20
+  return `https://t.me/${user}?text=${enc}`;
   }
   function openManager(ctx,title=''){
     const link = managerLink(ctx,title);
@@ -377,28 +428,47 @@
 
   const Portal=({children})=>ReactDOM.createPortal(children,document.getElementById('portal-root'));
 
-  function BottomSheet({title,onClose,children,theme}){
-    const [open,setOpen]=useState(true);
-    useEffect(()=>{ const T=tg(); const back=()=>onClose?.(); try{T?.BackButton?.show();}catch{} T?.onEvent?.('backButtonClicked',back); document.body.style.overflow='hidden'; return ()=>{document.body.style.overflow=''; try{T?.BackButton?.hide();}catch{} T?.offEvent?.('backButtonClicked',back);} },[onClose]);
-    return (
-      <Portal>
-        <div className={open?'sheet-open':''}>
-          <div className="sheet-overlay" onClick={()=>{setOpen(false);setTimeout(onClose,180);}}></div>
-          <div className="sheet glass rounded-t-2xl" style={{borderTop:`1px solid ${theme.border}`}}>
-            <div className="flex justify-end px-3 pt-3">
-              <button className="pressable px-3 py-1.5 rounded-full text-sm font-medium"
+function BottomSheet({title, onClose, children, theme}){
+  const [open,setOpen]=React.useState(true);
+  React.useEffect(()=>{
+    const T=window?.Telegram?.WebApp;
+    const back=()=>onClose?.();
+    try{T?.BackButton?.show();}catch{}
+    T?.onEvent?.('backButtonClicked',back);
+    document.body.style.overflow='hidden';
+    return ()=>{ 
+      document.body.style.overflow='';
+      try{T?.BackButton?.hide();}catch{}
+      T?.offEvent?.('backButtonClicked',back);
+    };
+  },[onClose]);
+
+  return (
+    <Portal>
+      <div className={open?'sheet-open':''}>
+        <div className="sheet-overlay" onClick={()=>{setOpen(false);setTimeout(onClose,180);}} />
+        <div className="sheet">
+          <div className="sheet-container glass" style={{borderTop:`1px solid ${theme.border}`}}>
+            <div className="sheet-header flex justify-end">
+              <button
+                className="pressable px-3 py-1.5 rounded-full text-sm font-medium"
                 style={{background:theme.panel,border:`1px solid ${theme.border}`}}
-                onClick={()=>{setOpen(false);setTimeout(onClose,180);}} aria-label="Закрыть">× Закрыть</button>
+                onClick={()=>{setOpen(false);setTimeout(onClose,180);}}
+                aria-label="Закрыть"
+              >× Закрыть</button>
             </div>
-            <div className="sheet-body">
-              <h3 className="text-lg font-semibold mb-2" style={{color:theme.heading}}>{title}</h3>
+
+            <div className="sheet-body modal-typo">
+              <h3 className="text-base font-semibold mb-2" style={{color:theme.heading}}>{title}</h3>
               {children}
             </div>
           </div>
         </div>
-      </Portal>
-    );
-  }
+      </div>
+    </Portal>
+  );
+}
+
 
   const Chip=({children})=><span className="px-2 py-1 rounded-full text-[11px] leading-none glass">{children}</span>;
 

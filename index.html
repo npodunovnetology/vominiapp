@@ -119,6 +119,30 @@
     .sticky-first th:nth-child(2),.sticky-first td:nth-child(2){
       padding-left:calc(var(--sticky-gap) + 12px)!important;
     }
+    /* фиксируем ширину первой колонки таблицы и включаем перенос текста */
+.table-scroll table {
+  table-layout: fixed; /* фиксированная сетка, не растягивается */
+}
+
+.col-title {
+  width: 220px;          /* ширина колонки на мобильных */
+  max-width: 220px;
+  white-space: normal;   /* разрешаем перенос строк */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+/* на планшетах чуть шире */
+@media (min-width: 768px) {
+  .col-title { width: 260px; max-width: 260px; }
+}
+
+/* на десктопах ещё немного шире */
+@media (min-width: 1024px) {
+  .col-title { width: 300px; max-width: 300px; }
+}
+
     @media (prefers-color-scheme: dark){
       .sticky-first th:first-child,.sticky-first td:first-child{
         background:rgba(18,20,24,.9);
@@ -571,7 +595,7 @@ function BottomSheet({title, onClose, children, theme}){
           <table className="min-w-[900px] w-full text-sm leading-snug sticky-first">
             <thead>
               <tr className="text-left">
-                <th className="pl-3 pr-3 py-2 w-[28%]">Программа</th>
+                <th className="pl-3 pr-3 py-2 col-title">Программа</th>
                 <th className="pr-3 py-2 w-[16%]">Вуз-партнёр</th>
                 <th className="pr-3 py-2 w-[12%]">Старт</th>
                 <th className="pr-3 py-2 w-[12%]">Длительность</th>
@@ -583,7 +607,7 @@ function BottomSheet({title, onClose, children, theme}){
             <tbody>
               {data.map(p=>(
                 <tr key={p.id} className="border-t align-top" style={{borderColor:theme.border}}>
-                  <td className="pl-3 pr-3 py-2 font-medium">{p.title}</td>
+                  <td className="pl-3 pr-3 py-2 font-medium col-title">{p.title}</td>
                   <td className="pr-3 py-2">{p.partners.join(', ')}</td>
                   <td className="pr-3 py-2">{dstr(p.start_date)}</td>
                   <td className="pr-3 py-2">{monthsStr(p.duration_months_est)}</td>

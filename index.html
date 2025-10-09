@@ -1,414 +1,462 @@
 <!DOCTYPE html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Нетология ДПО — Mini-app (Liquid Glass, fixed)</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Нетология ДПО — Telegram Mini-app (Liquid Glass)</title>
 
-    <!-- Telegram WebApp SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- React 18 UMD -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel for JSX (dev) -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- React 18 UMD -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel for JSX (dev only) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <style>
-      :root { --sab: env(safe-area-inset-bottom); }
-      /* Liquid glass helpers */
-      .glass {
-        background: rgba(255,255,255,0.16);
-        backdrop-filter: blur(18px);
-        -webkit-backdrop-filter: blur(18px);
-        border: 1px solid rgba(255,255,255,0.22);
-      }
-      .glass-strong {
-        background: rgba(255,255,255,0.22);
-        backdrop-filter: blur(24px);
-        -webkit-backdrop-filter: blur(24px);
-        border: 1px solid rgba(255,255,255,0.28);
-      }
-      .neon-ring { box-shadow: 0 0 0 1px rgba(255,255,255,.25), 0 8px 24px rgba(0,210,255,.22), inset 0 1px 0 rgba(255,255,255,.35); }
-      .pressable { transition: transform .08s ease, filter .2s ease, box-shadow .2s ease; }
-      .pressable:active { transform: translateY(1px) scale(.995); filter: saturate(1.05); }
+  <style>
+    :root { --sab: env(safe-area-inset-bottom); }
 
-      /* Compare table: keep as table on mobile */
-      .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-      .sticky-first th:first-child, .sticky-first td:first-child {
-        position: sticky; left: 0; z-index: 2;
-        background: rgba(255,255,255,0.82);
-        backdrop-filter: blur(10px);
-      }
-      @media (prefers-color-scheme: dark) {
-        .sticky-first th:first-child, .sticky-first td:first-child { background: rgba(20,20,20,0.72); }
-      }
-    </style>
-  </head>
+    /* Base backgrounds for light/dark */
+    body{background:var(--tg-theme-secondary-bg-color,#f5f7fb);}
+    @media (prefers-color-scheme:dark){
+      body{background:var(--tg-theme-secondary-bg-color, #0e1115);}
+    }
 
-  <body class="min-h-screen bg-[color:var(--tg-theme-secondary-bg-color,#f6f7f8)]">
-    <div id="root"></div>
+    /* Liquid-glass surfaces */
+    .glass{
+      background:rgba(255,255,255,.55);
+      -webkit-backdrop-filter:blur(18px) saturate(140%);
+      backdrop-filter:blur(18px) saturate(140%);
+      border:1px solid rgba(255,255,255,.28);
+    }
+    .glass-strong{
+      background:rgba(255,255,255,.72);
+      -webkit-backdrop-filter:blur(22px) saturate(160%);
+      backdrop-filter:blur(22px) saturate(160%);
+      border:1px solid rgba(255,255,255,.32);
+    }
+    @media (prefers-color-scheme:dark){
+      .glass{ background:rgba(20,22,26,.55); border-color:rgba(255,255,255,.1); }
+      .glass-strong{ background:rgba(26,29,34,.72); border-color:rgba(255,255,255,.12); }
+    }
 
-    <script type="text/babel">
-      const { useEffect, useMemo, useState } = React;
+    /* Press effect */
+    .pressable{ transition:transform .08s ease, filter .18s ease; }
+    .pressable:active{ transform:translateY(1px) scale(.996); filter:saturate(1.05); }
 
-      /* ===== Brand & Telegram theme ===== */
-      const BRAND = {
-        primary1: "#A0E9FF",
-        primary2: "#00D2FF",
-        primary3: "#24B6FF",
+    /* Sticky first column */
+    .table-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .sticky-first th:first-child, .sticky-first td:first-child{
+      position:sticky; left:0; z-index:2; backdrop-filter:blur(10px);
+      background:rgba(255,255,255,.85);
+    }
+    @media (prefers-color-scheme:dark){
+      .sticky-first th:first-child, .sticky-first td:first-child{ background:rgba(18,20,24,.8); }
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useEffect, useMemo, useState, useRef } = React;
+
+    /* ========= Brand & settings ========= */
+    const BRAND = {
+      g1: "#A0E9FF",
+      g2: "#00D2FF",
+      g3: "#24B6FF",
+      primary: "#00D2FF",
+    };
+
+    const SETTINGS = {
+      manager: { tg_username: "@netology_vo" },
+      webinars_url: "https://netology.ru/free/degree",
+      telegram_channel: "@netology_degree",
+      logoSvg: `<?xml version="1.0" encoding="UTF-8"?><svg width="148" height="22" viewBox="0 0 150 22" fill="none" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#c)"><path d="M29.57 4.686h3.151v4.884h5.394V4.686h3.151V17.314h-3.151v-5.123H32.72v5.123H29.57V4.686Z" fill="currentColor"/><path d="M49.866 17.6c-.86 0-1.679-.127-2.459-.381-.763-.27-1.432-.667-2.005-1.191-.573-.54-1.026-1.215-1.36-2.025-.334-.826-.501-1.787-.501-2.883v-.477c0-1.048.159-1.962.477-2.74.318-.778.756-1.421 1.313-1.93.557-.524 1.201-.913 1.933-1.167.732-.27 1.52-.405 2.363-.405 1.989 0 3.501.524 4.535 1.572 1.034 1.049 1.552 2.566 1.552 4.551v1.334H46.764c.016.556.111 1.04.286 1.453.175.397.406.723.692.977.287.254.613.445.979.572.381.112.763.167 1.145.167.812 0 1.424-.119 1.837-.357.413-.238.707-.587.882-1.048h2.888c-.255 1.318-.883 2.311-1.886 2.978-.001 0-1.242.333-2.722.333Z" fill="currentColor"/><path d="M60.83 7.307h-4.034V4.686H68.014v2.621H63.98v10.007H60.83V7.307Z" fill="currentColor"/><path d="M75.413 17.6c-.859 0-1.679-.127-2.458-.381-.763-.27-1.432-.675-2.005-1.215-.573-.54-1.026-1.215-1.36-2.025-.334-.81-.501-1.764-.501-2.86v-.477c0-1.032.167-1.938.501-2.716.334-.778.787-1.429 1.36-1.953.573-.524 1.242-.913 2.005-1.167.78-.27 1.599-.405 2.458-.405s1.87.135 2.634.405c.763.27 1.432.659 2.005 1.167.589.524 1.05 1.175 1.384 1.953.334.778.501 1.684.501 2.716v.477c0 1.08-.167 2.025-.501 2.835-.334.81-.795 1.476-1.384 1.996-.573.54-1.242.944-2.005 1.215-.764.27-1.582.405-2.442.405Z" fill="currentColor"/><path d="M83.883 17.6c-.127 0-.286-.008-.477-.024-.191 0-.35-.016-.477-.048v-2.835c.08.016.199.024.358.024.302 0 .564-.087.787-.262.223-.19.406-.507.549-.952.159-.444.27-1.033.334-1.763.08-.747.119-1.668.119-2.764V4.686h10.025V17.314H91.95V7.307h-3.962v2.144c0 1.636-.087 2.986-.262 4.05-.159 1.048-.414 1.875-.764 2.478-.334.603-.764 1.024-1.289 1.262-.509.238-1.106.359-1.792.359Z" fill="currentColor"/><path d="M103.687 17.6c-.859 0-1.679-.127-2.458-.381-.764-.27-1.432-.675-2.005-1.215-.573-.54-1.027-1.215-1.361-2.025-.334-.81-.5-1.764-.5-2.86v-.477c0-1.032.166-1.938.5-2.716.334-.778.788-1.429 1.361-1.953.573-.524 1.241-.913 2.005-1.167.779-.27 1.599-.405 2.458-.405.859 0 1.671.135 2.435.405.764.27 1.432.659 2.005 1.167.589.524 1.05 1.175 1.384 1.953.334.778.501 1.684.501 2.716v.477c0 1.08-.167 2.025-.501 2.835-.334.81-.795 1.476-1.384 1.996-.573.54-1.241.944-2.005 1.215-.764.27-1.582.405-2.442.405Z" fill="currentColor"/><path d="M112.509 4.686h9.07v2.621h-5.919v10.007h-3.151V4.686Z" fill="currentColor"/><path d="M123.482 4.686h3.151v8.101l5.633-8.101h2.912V17.314h-3.151V9.213l-5.633 8.101h-2.912V4.686Z" fill="currentColor"/><path d="M140.604 12.573c-.97-.317-1.678-.794-2.124-1.429-.445-.636-.667-1.382-.667-2.239 0-.62.104-1.183.31-1.691.223-.525.549-.97.979-1.335.43-.381.971-.675 1.623-.881.668-.206 1.448-.31 2.339-.31h5.967v12.628h-3.151v-4.36h-2.267l-2.745 4.36h-3.533l2.958-4.742Zm.358-3.669c0 .54.175.937.526 1.191.366.254.85.381 1.456.381h2.935V7.307h-2.935c-.605 0-1.089.135-1.456.405-.351.254-.526.62-.526 1.191Z" fill="currentColor"/><path d="M6.214 11.512c.144 0 .286.007.427.019 0 0 .3 2.447 2.774 2.647.028.216.044.436.044.66 0 2.896-2.347 5.244-5.244 5.244S.97 17.733.97 14.836s2.348-5.244 5.244-5.244Z" fill="currentColor"/><path d="M6.214 0c2.896 0 5.244 2.348 5.244 5.244 0 .135-.007.269-.017.401C8.864 5.84 6.81 7.895 6.615 10.471c-.132.01-.265.017-.4.017C3.318 10.488.97 8.14.97 5.244.97 2.348 3.318 0 6.214 0Z" fill="currentColor"/><path d="M17.726 0c2.896 0 5.244 2.348 5.244 5.244 0 2.897-2.348 5.244-5.244 5.244-.223 0-.442-.016-.658-.043-.2-2.478-2.121-4.469-4.567-4.775-.011-.14-.018-.282-.018-.425 0-2.896 2.348-5.244 5.244-5.244Z" fill="currentColor"/><path d="M17.726 11.512c2.896 0 5.244 2.347 5.244 5.244 0 2.896-2.348 5.244-5.244 5.244-2.896 0-5.244-2.348-5.244-5.244 0-.233.017-.462.045-.687 2.348-.307 4.206-2.164 4.512-4.512.225-.03.454-.045.687-.045Z" fill="currentColor"/></g><defs><clipPath id="c"><rect width="148.06" height="22" fill="#fff" transform="translate(.97)"/></clipPath></defs></svg>`,
+    };
+
+    const getTG = () => (typeof window !== 'undefined' ? window?.Telegram?.WebApp : undefined);
+    const openUrl = (url) => {
+      const tg = getTG();
+      if (tg?.openLink) tg.openLink(url, { try_instant_view: false });
+      else window.open(url, '_blank', 'noopener,noreferrer');
+    };
+    const openTelegram = (usernameOrUrl) => {
+      const tg = getTG();
+      const link = usernameOrUrl.startsWith("http") ? usernameOrUrl : `https://t.me/${usernameOrUrl.replace('@','')}`;
+      if (tg?.openTelegramLink) tg.openTelegramLink(link); else window.open(link, '_blank', 'noopener,noreferrer');
+    };
+
+    const haptic = {
+      light: () => getTG()?.HapticFeedback?.impactOccurred?.('light'),
+      selection: () => getTG()?.HapticFeedback?.selectionChanged?.(),
+    };
+
+    function getThemeFromTG(){
+      const p = getTG()?.themeParams || {};
+      const dark = getTG()?.colorScheme === 'dark';
+      return {
+        dark,
+        heading: p.text_color || (dark ? '#FFFFFF' : '#0b0b0b'),
+        text:    p.text_color || (dark ? '#ECECEC' : '#1b1e22'),
+        border:  p.section_separator_color || (dark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)'),
+        panel:   dark ? 'rgba(20,22,26,.55)' : 'rgba(255,255,255,.55)',
       };
-
-      const getTG = () => (typeof window !== 'undefined' ? window?.Telegram?.WebApp : undefined);
-      const openUrl = (url) => {
+    }
+    function useTelegramTheme(){
+      const [theme, setTheme] = useState(getThemeFromTG());
+      useEffect(()=>{
         const tg = getTG();
-        if (tg?.openLink) tg.openLink(url, { try_instant_view: false });
-        else window.open(url, '_blank', 'noopener,noreferrer');
-      };
-      const openTelegram = (url) => {
-        const tg = getTG();
-        if (tg?.openTelegramLink) tg.openTelegramLink(url);
-        else window.open(url, '_blank', 'noopener,noreferrer');
-      };
-      const haptic = {
-        light: () => getTG()?.HapticFeedback?.impactOccurred?.('light'),
-        selection: () => getTG()?.HapticFeedback?.selectionChanged?.(),
-      };
+        const onChange = ()=> setTheme(getThemeFromTG());
+        tg?.onEvent?.('themeChanged', onChange);
+        return ()=> tg?.offEvent?.('themeChanged', onChange);
+      },[]);
+      return theme;
+    }
 
-      function getThemeFromTG() {
-        const p = getTG()?.themeParams || {};
-        const dark = getTG()?.colorScheme === 'dark';
-        return {
-          dark,
-          text: p.text_color || (dark ? '#ECECEC' : '#1f1f1f'),
-          heading: p.text_color || (dark ? '#FFFFFF' : '#0b0b0b'),
-          panel: dark ? 'rgba(20,22,24,.55)' : 'rgba(255,255,255,.55)',
-          border: p.section_separator_color || 'rgba(0,0,0,.08)',
-        };
-      }
-      function useTelegramTheme() {
-        const [theme, setTheme] = useState(getThemeFromTG());
-        useEffect(() => {
-          const tg = getTG();
-          const onChange = () => setTheme(getThemeFromTG());
-          tg?.onEvent?.('themeChanged', onChange);
-          return () => tg?.offEvent?.('themeChanged', onChange);
-        }, []);
-        return theme;
-      }
+    /* ========= Data (сокращённо; можешь расширить) ========= */
+    const PROGRAMS = [
+      {
+        id: 'dpo-python-mfti',
+        title: 'Python: от кода к стартапу',
+        partners: ['МФТИ'],
+        start_date: '2025-10-20',
+        duration_months_est: 7,
+        price_full_rub: 158400,
+        price_from_per_month_rub: 6947,
+        landing_url: 'https://netology.ru/programs/razrabotchik-na-python-s-mfti',
+        audience: [
+          'Новичкам, которые хотят войти в разработку на Python',
+          'Аналитикам и инженерам для автоматизации задач',
+          'Специалистам смежных ролей (QA, DevOps, BI)',
+        ],
+        diploma: 'Два диплома о профпереподготовке: МФТИ и Нетологии',
+        learn: ['Python, API, БД', 'Web/боты/деплой', 'Проект от идеи до MVP'],
+        about: 'Путь от базового кода до работающего прототипа и питча.',
+      },
+      {
+        id: 'dpo-ai-pm-mfti',
+        title: 'Руководитель проектов в области ИИ',
+        partners: ['МФТИ'],
+        start_date: '2025-12-08',
+        duration_months_est: 3,
+        price_full_rub: 114700,
+        price_from_per_month_rub: 5031,
+        landing_url: 'https://netology.ru/programs/rukovoditel-proektov-v-oblasti-iskusstvennogo-intellekta-dpo-mfti',
+        audience: [
+          'Менеджерам и продактам, запускающим AI-инициативы',
+          'Руководителям, внедряющим ИИ',
+          'Координаторам ML/DS-команд',
+        ],
+        diploma: 'Два удостоверения о повышении квалификации: МФТИ и Нетологии',
+        learn: ['Цикл AI-проекта', 'Оценка эффекта и рисков', 'Коммуникация бизнес ↔ ML'],
+        about: 'Системный менеджмент AI-проектов от постановки до релиза.',
+      },
+    ];
 
-      /* ===== Data (пример — добавь остальные по той же схеме) ===== */
-      const PROGRAMS = [
-        {
-          id: 'dpo-python-mfti',
-          title: 'Python: от кода к стартапу',
-          partners: ['МФТИ'],
-          start_date: '2025-10-20',
-          duration_months_est: 7,
-          price_full_rub: 158400,
-          price_from_per_month_rub: 6947,
-          landing_url: 'https://netology.ru/programs/razrabotchik-na-python-s-mfti',
-          audience: [
-            'Новичкам, которые хотят войти в разработку на Python',
-            'Аналитикам и инженерам для автоматизации задач',
-            'Специалистам смежных ролей (QA, DevOps, BI)',
-          ],
-          diploma: 'Два диплома о профпереподготовке: МФТИ и Нетологии',
-          learn: ['Python, API, БД', 'Web/боты/деплой', 'Проект от идеи до MVP'],
-          about: 'Путь от базового кода до работающего прототипа и питча.',
-        },
-        {
-          id: 'dpo-ai-pm-mfti',
-          title: 'Руководитель проектов в области ИИ',
-          partners: ['МФТИ'],
-          start_date: '2025-12-08',
-          duration_months_est: 3,
-          price_full_rub: 114700,
-          price_from_per_month_rub: 5031,
-          landing_url: 'https://netology.ru/programs/rukovoditel-proektov-v-oblasti-iskusstvennogo-intellekta-dpo-mfti',
-          audience: [
-            'Менеджерам и продактам, запускающим AI-инициативы',
-            'Руководителям, внедряющим ИИ',
-            'Координаторам ML/DS-команд',
-          ],
-          diploma: 'Два удостоверения о повышении квалификации: МФТИ и Нетологии',
-          learn: ['Цикл AI-проекта', 'Оценка эффекта и рисков', 'Коммуникация бизнес ↔ ML'],
-          about: 'Системный менеджмент AI-проектов от постановки до релиза.',
-        },
-      ];
+    const rub = (n)=> new Intl.NumberFormat('ru-RU').format(n);
+    const dstr = (s)=> new Date(s).toLocaleDateString('ru-RU', { day:'2-digit', month:'long', year:'numeric' });
 
-      const rub = (n) => new Intl.NumberFormat('ru-RU').format(n);
-      const dstr = (s) => new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
+    /* ========= UI ========= */
+    function LogoBrand(){
+      const tg = getTG();
+      const color = tg?.colorScheme === 'dark' ? '#FFFFFF' : '#000000';
+      return <span className="h-6 inline-flex items-center" style={{color}} dangerouslySetInnerHTML={{__html: SETTINGS.logoSvg}} />;
+    }
 
-      /* ===== UI Primitives ===== */
-      const Chip = ({children}) => (
-        <span className="px-2 py-1 rounded-full text-[11px] leading-none glass neon-ring text-gray-900/85 dark:text-white/90">
-          {children}
-        </span>
+    function TopBar({ theme }){
+      const gradient = `linear-gradient(90deg, ${BRAND.g2}, ${BRAND.g3})`;
+      return (
+        <div className="sticky top-0 z-20" style={{ backdropFilter:'blur(6px) saturate(140%)' }}>
+          <div className="max-w-5xl mx-auto px-4 pt-[max(12px,env(safe-area-inset-top))] pb-3">
+            <div className="glass rounded-2xl px-3 py-2 pressable" style={{borderColor: theme.border}}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <LogoBrand />
+                </div>
+                <button
+                  className="px-3 py-1.5 rounded-xl text-sm text-white pressable"
+                  style={{ backgroundImage: gradient }}
+                  onClick={()=> openTelegram(SETTINGS.manager.tg_username)}
+                >Написать менеджеру</button>
+              </div>
+            </div>
+          </div>
+        </div>
       );
+    }
 
-      function TopBar({ theme }) {
-        const gradient = `linear-gradient(90deg, ${BRAND.primary2}, ${BRAND.primary3})`;
-        return (
-          <div className="sticky top-0 z-20" style={{ backdropFilter: 'saturate(140%) blur(6px)' }}>
-            <div className="mx-auto max-w-5xl px-4 pt-[max(12px,env(safe-area-inset-top))] pb-3">
-              <div className="rounded-2xl px-3 py-2 pressable neon-ring" style={{ background: theme.panel }}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="text-sm md:text-base font-semibold text-transparent bg-clip-text select-none"
-                      style={{ backgroundImage: gradient, WebkitBackgroundClip: 'text' }}
-                    >
-                      Нетология · ДПО
-                    </span>
-                  </div>
-                  <button
-                    className="px-3 py-1.5 rounded-xl text-sm text-white pressable"
-                    style={{ backgroundImage: gradient }}
-                    onClick={() => openTelegram('https://t.me/netology')}
-                  >
-                    Написать менеджеру
-                  </button>
-                </div>
+    function Modal({ title, onClose, children, theme }){
+      // Swipe-to-close
+      const sheetRef = useRef(null);
+      const startY = useRef(null); const delta = useRef(0);
+      useEffect(()=>{
+        const tg = getTG();
+        const back = ()=> onClose?.();
+        try { tg?.BackButton?.show(); } catch {}
+        tg?.onEvent?.('backButtonClicked', back);
+        return ()=> { try { tg?.BackButton?.hide(); } catch {} tg?.offEvent?.('backButtonClicked', back); };
+      },[onClose]);
+
+      useEffect(()=>{
+        const el = sheetRef.current;
+        if(!el) return;
+        const onStart = (e)=>{ startY.current = (e.touches? e.touches[0].clientY : e.clientY); };
+        const onMove  = (e)=>{ if(startY.current==null) return; const y=(e.touches?e.touches[0].clientY:e.clientY); delta.current = Math.max(0, y - startY.current); el.style.transform = `translateY(${delta.current}px)`; el.style.opacity = `${Math.max(0.6, 1 - delta.current/600)}`; };
+        const onEnd   = ()=>{ if(delta.current > 80) onClose(); el.style.transform=''; el.style.opacity=''; startY.current=null; delta.current=0; };
+        el.addEventListener('touchstart', onStart, {passive:true});
+        el.addEventListener('touchmove', onMove, {passive:true});
+        el.addEventListener('touchend', onEnd);
+        el.addEventListener('mousedown', onStart);
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onEnd);
+        return ()=>{ el.removeEventListener('touchstart', onStart); el.removeEventListener('touchmove', onMove); el.removeEventListener('touchend', onEnd); el.removeEventListener('mousedown', onStart); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onEnd); };
+      },[onClose]);
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={onClose} />
+          <div ref={sheetRef} className="relative w-full md:max-w-2xl md:rounded-3xl glass-strong md:shadow-2xl" style={{borderColor: theme.border}}>
+            <div className="p-4 md:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="text-lg font-semibold" style={{color: theme.heading}}>{title}</h3>
+                <button onClick={onClose} className="text-sm opacity-90 hover:opacity-100">Закрыть</button>
               </div>
+              {children}
             </div>
           </div>
-        );
-      }
+        </div>
+      );
+    }
 
-      function Modal({ title, onClose, children, theme }) {
-        useEffect(() => {
-          const tg = getTG();
-          try { tg?.BackButton?.show(); } catch {}
-          const handler = () => onClose?.();
-          tg?.onEvent?.('backButtonClicked', handler);
-          return () => {
-            try { tg?.BackButton?.hide(); } catch {}
-            tg?.offEvent?.('backButtonClicked', handler);
-          };
-        }, [onClose]);
+    const Chip = ({children}) => (
+      <span className="px-2 py-1 rounded-full text-[11px] leading-none glass" style={{borderColor:'rgba(0,0,0,.08)'}}>
+        {children}
+      </span>
+    );
 
-        return (
-          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
-            <div className="absolute inset-0 bg-black/45" onClick={onClose} />
-            <div className="relative w-full md:max-w-2xl md:rounded-3xl glass-strong neon-ring md:shadow-2xl">
-              <div className="p-4 md:p-6">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-lg font-semibold" style={{color: theme.heading}}>{title}</h3>
-                  <button onClick={onClose} className="text-sm opacity-80 hover:opacity-100">Закрыть</button>
-                </div>
-                {children}
+    function ProgramCard({ p, onCompareToggle, selected, theme }){
+      const [open, setOpen] = useState(false);
+      const gradient = `linear-gradient(90deg, ${BRAND.g2}, ${BRAND.g3})`;
+      return (
+        <div className="rounded-3xl p-4 md:p-5 pressable glass" style={{borderColor: theme.border}}>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-base md:text-lg font-semibold" style={{color: theme.heading}}>{p.title}</div>
+              <div className="mt-1 text-sm opacity-80" style={{color: theme.text}}>Партнёр: {p.partners.join(', ')}</div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <Chip>Старт: {dstr(p.start_date)}</Chip>
+                <Chip>{p.duration_months_est} мес</Chip>
+                <Chip>{rub(p.price_full_rub)} ₽</Chip>
+                <Chip>от {rub(p.price_from_per_month_rub)} ₽/мес</Chip>
               </div>
             </div>
+            <button onClick={()=> onCompareToggle(p.id)} className={`px-3 py-2 rounded-xl text-xs md:text-sm glass ${selected?'font-semibold':''}`}>
+              {selected ? 'В сравнении' : 'Сравнить'}
+            </button>
           </div>
-        );
-      }
 
-      function ProgramCard({ p, onCompareToggle, selected, theme }) {
-        const [open, setOpen] = useState(false);
-        const gradient = `linear-gradient(90deg, ${BRAND.primary2}, ${BRAND.primary3})`;
-        return (
-          <div className="rounded-3xl p-4 md:p-5 pressable neon-ring" style={{ background: theme.panel }}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-base md:text-lg font-semibold" style={{color: theme.heading}}>
-                  {p.title}
-                </div>
-                <div className="mt-1 text-sm opacity-80">Партнёр: {p.partners.join(', ')}</div>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  <Chip>Старт: {dstr(p.start_date)}</Chip>
-                  <Chip>{p.duration_months_est} мес</Chip>
-                  <Chip>{rub(p.price_full_rub)} ₽</Chip>
-                  <Chip>от {rub(p.price_from_per_month_rub)} ₽/мес</Chip>
-                </div>
+          <div className="mt-4 flex gap-2">
+            <button className="flex-1 py-2 rounded-xl text-white pressable" style={{backgroundImage: gradient}} onClick={()=> openUrl(p.landing_url)}>Открыть программу</button>
+            <button className="flex-1 py-2 rounded-xl pressable glass" onClick={()=> setOpen(true)}>Подробнее</button>
+          </div>
+
+          {open && (
+            <Modal title={p.title} onClose={()=> setOpen(false)} theme={theme}>
+              <div className="mt-2 text-sm opacity-90" style={{color: theme.text}}>{p.about}</div>
+
+              <div className="mt-4">
+                <div className="text-sm font-medium" style={{color: theme.heading}}>Кому подойдёт</div>
+                <ul className="list-disc ml-5 mt-1 text-sm opacity-90 space-y-1" style={{color: theme.text}}>
+                  {p.audience.map((a,i)=><li key={i}>{a}</li>)}
+                </ul>
               </div>
-              <button
-                onClick={() => onCompareToggle(p.id)}
-                className={`px-3 py-2 rounded-xl text-xs md:text-sm pressable glass ${selected ? 'font-semibold' : ''}`}
-              >
-                {selected ? 'В сравнении' : 'Сравнить'}
-              </button>
-            </div>
 
-            <div className="mt-4 flex gap-2">
-              <button
-                className="flex-1 py-2 rounded-xl text-white pressable"
-                style={{ backgroundImage: gradient }}
-                onClick={() => openUrl(p.landing_url)}
-              >
-                Открыть программу
-              </button>
-              <button
-                className="flex-1 py-2 rounded-xl pressable glass"
-                onClick={() => setOpen(true)}
-              >
-                Подробнее
-              </button>
-            </div>
+              <div className="mt-4">
+                <div className="text-sm font-medium" style={{color: theme.heading}}>Чему научитесь</div>
+                <ul className="list-disc ml-5 mt-1 text-sm opacity-90 space-y-1" style={{color: theme.text}}>
+                  {p.learn.map((a,i)=><li key={i}>{a}</li>)}
+                </ul>
+              </div>
 
-            {open && (
-              <Modal title={p.title} onClose={() => setOpen(false)} theme={theme}>
-                <div className="mt-2 text-sm opacity-90">{p.about}</div>
+              <div className="mt-4 text-sm opacity-90" style={{color: theme.text}}>
+                <span className="font-medium">Документ: </span>{p.diploma}
+              </div>
 
-                <div className="mt-4">
-                  <div className="text-sm font-medium" style={{color: theme.heading}}>Кому подойдёт</div>
-                  <ul className="list-disc ml-5 mt-1 text-sm opacity-90 space-y-1">
-                    {p.audience.map((a,i)=><li key={i}>{a}</li>)}
-                  </ul>
-                </div>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button className="px-4 py-2 rounded-xl text-white pressable" style={{backgroundImage: gradient}} onClick={()=> openUrl(p.landing_url)}>Перейти на сайт</button>
+                <button className="px-4 py-2 rounded-xl glass pressable" onClick={()=> openTelegram(SETTINGS.manager.tg_username)}>Написать менеджеру</button>
+              </div>
+            </Modal>
+          )}
+        </div>
+      );
+    }
 
-                <div className="mt-4">
-                  <div className="text-sm font-medium" style={{color: theme.heading}}>Чему научитесь</div>
-                  <ul className="list-disc ml-5 mt-1 text-sm opacity-90 space-y-1">
-                    {p.learn.map((a,i)=><li key={i}>{a}</li>)}
-                  </ul>
-                </div>
+    function CompareTable({ ids, onReset, theme }){
+      const data = PROGRAMS.filter(p => ids.includes(p.id));
+      if (!data.length) return null;
 
-                <div className="mt-4 text-sm opacity-90">
-                  <span className="font-medium">Документ: </span>{p.diploma}
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    className="px-4 py-2 rounded-xl text-white pressable"
-                    style={{ backgroundImage: gradient }}
-                    onClick={() => openUrl(p.landing_url)}
-                  >
-                    Перейти на сайт
-                  </button>
-                  <button
-                    className="px-4 py-2 rounded-xl glass pressable"
-                    onClick={() => openTelegram('https://t.me/netology')}
-                  >
-                    Написать менеджеру
-                  </button>
-                </div>
-              </Modal>
-            )}
+      return (
+        <div className="rounded-3xl p-4 glass" style={{borderColor: theme.border}}>
+          <div className="flex items-center justify-between">
+            <div className="text-base font-semibold" style={{color: theme.heading}}>Сравнение программ</div>
+            <button onClick={onReset} className="px-3 py-1.5 rounded-xl text-sm glass pressable">Сбросить</button>
           </div>
-        );
-      }
 
-      function CompareTable({ ids, onReset, theme }) {
-        const data = PROGRAMS.filter(p => ids.includes(p.id));
-        if (!data.length) return null;
-
-        return (
-          <div className="rounded-3xl p-4 neon-ring" style={{ background: theme.panel }}>
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-base font-semibold" style={{color: theme.heading}}>Сравнение программ</div>
-              <button onClick={onReset} className="px-3 py-1.5 rounded-xl text-sm glass pressable">Сбросить</button>
-            </div>
-
-            <div className="table-scroll mt-3 rounded-2xl">
-              <table className="min-w-[760px] w-full text-sm leading-snug sticky-first">
-                <thead>
-                  <tr className="text-left">
-                    <th className="py-2 pr-3 w-[28%]">Программа</th>
-                    <th className="py-2 pr-3 w-[16%]">Вуз-партнёр</th>
-                    <th className="py-2 pr-3 w-[12%]">Старт</th>
-                    <th className="py-2 pr-3 w-[12%]">Длительность</th>
-                    <th className="py-2 pr-3 w-[12%]">Цена</th>
-                    <th className="py-2 pr-3 w-[14%]">От ₽/мес</th>
-                    <th className="py-2 pr-3 w-[40%]">Навыки</th>
+          <div className="table-scroll mt-3 rounded-2xl">
+            <table className="min-w-[760px] w-full text-sm leading-snug sticky-first">
+              <thead>
+                <tr className="text-left">
+                  <th className="py-2 pr-3 w-[28%]">Программа</th>
+                  <th className="py-2 pr-3 w-[16%]">Вуз-партнёр</th>
+                  <th className="py-2 pr-3 w-[12%]">Старт</th>
+                  <th className="py-2 pr-3 w-[12%]">Длительность</th>
+                  <th className="py-2 pr-3 w-[12%]">Цена</th>
+                  <th className="py-2 pr-3 w-[14%]">От ₽/мес</th>
+                  <th className="py-2 pr-3 w-[40%]">Навыки</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.map(p=>(
+                  <tr key={p.id} className="border-t" style={{borderColor: theme.border}}>
+                    <td className="py-2 pr-3 font-medium">{p.title}</td>
+                    <td className="py-2 pr-3">{p.partners.join(', ')}</td>
+                    <td className="py-2 pr-3">{dstr(p.start_date)}</td>
+                    <td className="py-2 pr-3">{p.duration_months_est} мес</td>
+                    <td className="py-2 pr-3">{rub(p.price_full_rub)} ₽</td>
+                    <td className="py-2 pr-3">{rub(p.price_from_per_month_rub)} ₽</td>
+                    <td className="py-2 pr-3 opacity-90">{p.learn.join(' · ')}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {data.map(p => (
-                    <tr key={p.id} className="border-t border-black/10 dark:border-white/20 align-top">
-                      <td className="py-2 pr-3 font-medium">{p.title}</td>
-                      <td className="py-2 pr-3">{p.partners.join(', ')}</td>
-                      <td className="py-2 pr-3">{dstr(p.start_date)}</td>
-                      <td className="py-2 pr-3">{p.duration_months_est} мес</td>
-                      <td className="py-2 pr-3">{rub(p.price_full_rub)} ₽</td>
-                      <td className="py-2 pr-3">{rub(p.price_from_per_month_rub)} ₽</td>
-                      <td className="py-2 pr-3 opacity-90">{p.learn.join(' · ')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    function IntroBlocks({ theme }){
+      return (
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="glass rounded-2xl p-4" style={{borderColor: theme.border}}>
+            <div className="text-sm font-medium" style={{color: theme.heading}}>Что такое ДПО</div>
+            <div className="mt-1 text-xs" style={{color: theme.text}}>
+              Краткие практические программы повышения квалификации или переподготовки. Итог: документ вуза-партнёра и документ Нетологии (диплом о профпереподготовке или удостоверение о повышении квалификации — зависит от программы).
             </div>
           </div>
-        );
-      }
-
-      function Filters({ partner, setPartner, theme }) {
-        const partners = useMemo(() => {
-          const set = new Set();
-          PROGRAMS.forEach(p => p.partners.forEach(x => set.add(x)));
-          return ['Все вузы', ...Array.from(set)];
-        }, []);
-        return (
-          <div className="flex gap-2">
-            <select
-              value={partner}
-              onChange={(e)=>{ haptic.selection(); setPartner(e.target.value); }}
-              className="w-full md:w-1/3 glass neon-ring rounded-2xl px-3 py-2"
-            >
-              {partners.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
+          <div className="glass rounded-2xl p-4" style={{borderColor: theme.border}}>
+            <div className="text-sm font-medium" style={{color: theme.heading}}>Формат</div>
+            <div className="mt-1 text-xs" style={{color: theme.text}}>
+              Онлайн, записи занятий, гибкий график. Рекомендованная нагрузка — 20–30 ч/нед.
+            </div>
           </div>
-        );
-      }
+        </div>
+      );
+    }
 
-      function App() {
-        const [partner, setPartner] = useState('Все вузы');
-        const [compareIds, setCompareIds] = useState([]);
-        const theme = useTelegramTheme();
-
-        useEffect(() => {
-          const tg = getTG();
-          if (tg) {
-            try { tg.ready(); tg.expand?.(); tg.setHeaderColor?.('bg_color'); tg.setBackgroundColor?.('secondary_bg_color'); } catch {}
-          }
-        }, []);
-
-        const filtered = useMemo(
-          () => PROGRAMS.filter(p => partner === 'Все вузы' || p.partners.includes(partner)),
-          [partner]
-        );
-        const toggleCompare = (id) =>
-          setCompareIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id].slice(-4)));
-
-        return (
-          <div className="min-h-screen">
-            <TopBar theme={theme} />
-            <main className="max-w-5xl mx-auto px-4 pb-[calc(40px+var(--sab))]">
-              <header className="pt-3 pb-2">
-                <h1 className="text-lg md:text-xl font-semibold" style={{color: theme.heading}}>
-                  Программы ДПО с дипломом вуза
-                </h1>
-                <p className="opacity-90 text-sm md:text-base" style={{color: theme.text}}>
-                  Перетащили подробности внутрь модалки, а карточки сделали легче.
-                </p>
-              </header>
-
-              <section className="mt-2">
-                <Filters partner={partner} setPartner={setPartner} theme={theme} />
-              </section>
-
-              <section className="mt-4">
-                <CompareTable ids={compareIds} onReset={()=>setCompareIds([])} theme={theme} />
-              </section>
-
-              <section className="mt-4 grid gap-3">
-                {filtered.map(p => (
-                  <ProgramCard key={p.id} p={p} onCompareToggle={toggleCompare} selected={compareIds.includes(p.id)} theme={theme} />
-                ))}
-              </section>
-
-              <footer className="text-center text-xs opacity-80 mt-8" style={{color: theme.text}}>
-                Информация не является публичной офертой. Уточняйте условия у менеджера.
-              </footer>
-            </main>
+    function WebinarsAndTG({ theme }){
+      const gradient = `linear-gradient(90deg, ${BRAND.g2}, ${BRAND.g3})`;
+      return (
+        <>
+          <div className="glass rounded-2xl p-4" style={{borderColor: theme.border}}>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-base font-semibold" style={{color: theme.heading}}>Бесплатные вебинары</div>
+                <div className="text-xs mt-1" style={{color: theme.text}}>
+                  Открытые эфиры с преподавателями: формат, учебный план, ответы на вопросы. Запись присылаем после эфира.
+                </div>
+              </div>
+              <button className="px-4 py-2 rounded-xl text-white pressable" style={{backgroundImage: gradient}} onClick={()=> openUrl(SETTINGS.webinars_url)}>
+                Календарь
+              </button>
+            </div>
           </div>
-        );
-      }
 
-      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-    </script>
-  </body>
+          <div className="glass rounded-2xl p-4 text-center" style={{borderColor: theme.border}}>
+            <div className="text-base font-semibold mb-1" style={{color: theme.heading}}>Подписывайтесь на Telegram-канал</div>
+            <div className="text-xs mb-3" style={{color: theme.text}}>Новости, обновления программ и бесплатные мероприятия.</div>
+            <button className="px-4 py-2 rounded-xl text-white pressable" style={{backgroundImage: gradient}} onClick={()=> openTelegram(SETTINGS.telegram_channel)}>
+              Перейти в канал {SETTINGS.telegram_channel}
+            </button>
+          </div>
+        </>
+      );
+    }
+
+    function Filters({ partner, setPartner, theme }){
+      const partners = useMemo(()=>{
+        const set = new Set();
+        PROGRAMS.forEach(p=> p.partners.forEach(x=> set.add(x)));
+        return ['Все вузы', ...Array.from(set)];
+      },[]);
+      return (
+        <div className="flex gap-2">
+          <select value={partner} onChange={(e)=>{ haptic.selection(); setPartner(e.target.value); }} className="px-3 py-2 rounded-2xl glass w-full md:w-1/3" style={{borderColor: theme.border}}>
+            {partners.map(p=> <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+      );
+    }
+
+    function App(){
+      const [partner, setPartner] = useState('Все вузы');
+      const [compareIds, setCompareIds] = useState([]);
+      const theme = useTelegramTheme();
+
+      useEffect(()=>{
+        const tg = getTG();
+        if (tg){
+          try{ tg.ready(); tg.expand?.(); tg.setHeaderColor?.('bg_color'); tg.setBackgroundColor?.('secondary_bg_color'); }catch{}
+        }
+      },[]);
+
+      const filtered = useMemo(()=> PROGRAMS.filter(p=> partner==='Все вузы' || p.partners.includes(partner)), [partner]);
+      const toggleCompare = (id)=> setCompareIds(prev => (prev.includes(id)? prev.filter(x=>x!==id) : [...prev, id].slice(-4)));
+
+      return (
+        <div className="min-h-screen">
+          <TopBar theme={theme} />
+          <main className="max-w-5xl mx-auto px-4 pb-[calc(40px+var(--sab))]">
+            <header className="pt-3 pb-2">
+              <h1 className="text-lg md:text-xl font-semibold" style={{color: theme.heading}}>Программы ДПО с дипломом вуза</h1>
+              <p className="mt-1 text-sm md:text-base" style={{color: theme.text}}>Карточки — лёгкие; подробности — в модалке. Палитра и градиенты — как у Нетологии.</p>
+            </header>
+
+            <IntroBlocks theme={theme} />
+
+            <section className="mt-3">
+              <Filters partner={partner} setPartner={setPartner} theme={theme} />
+            </section>
+
+            <section className="mt-4">
+              <CompareTable ids={compareIds} onReset={()=> setCompareIds([])} theme={theme} />
+            </section>
+
+            <section className="mt-4 grid gap-3">
+              {filtered.map(p => (
+                <ProgramCard key={p.id} p={p} onCompareToggle={toggleCompare} selected={compareIds.includes(p.id)} theme={theme} />
+              ))}
+            </section>
+
+            <section className="mt-4 grid gap-3">
+              <WebinarsAndTG theme={theme} />
+            </section>
+
+            <footer className="pt-6 pb-[calc(40px+var(--sab))] text-center text-xs" style={{color: theme.text}}>
+              Информация в приложении не является публичной офертой. Уточняйте условия у менеджера.
+            </footer>
+          </main>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
 </html>

@@ -109,13 +109,13 @@
 
 
     /* compare table */
-    /* только горизонтальный скролл в таблице */
-.table-scroll {
-  overflow-x: auto;        /* разрешаем прокрутку влево-вправо */
-  overflow-y: hidden;      /* убираем вертикальную */
+/* Только горизонтальный скролл внутри таблицы */
+.table-scroll{
+  overflow-x: auto;           /* листаем влево-вправо */
+  overflow-y: hidden;         /* вертикали у таблицы нет */
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain; /* свайп остаётся внутри таблицы по горизонтали */
-  overscroll-behavior-y: none;    /* вверх-вниз — страница, не таблица */
+  touch-action: pan-x;        /* вертикальные жесты отдать странице (мобилки) */
+  overscroll-behavior: auto;  /* разрешаем прокидку скролла родителю */
 }
     .sticky-first th:first-child,.sticky-first td:first-child{
       position:sticky;left:0;z-index:2;background:rgba(255,255,255,.92);
@@ -622,7 +622,7 @@ function BottomSheet({title, onClose, children, theme}){
   const data = PROGRAMS.filter(p => ids.includes(p.id));
   if (!data.length) return null;
 
-  // Критерии для строк
+  // строки-критерии
   const criteria = [
     { key: "partners", label: "Вуз-партнёр", get: p => p.partners.join(", ") },
     { key: "start_date", label: "Старт", get: p => dstr(p.start_date) },
@@ -633,24 +633,40 @@ function BottomSheet({title, onClose, children, theme}){
     { key: "diploma", label: "Документ", get: p => p.diploma },
   ];
 
+  // обёртка для горизонтального скролла
+  const wrapRef = React.useRef(null);
+
+  // ПК/тачпады: вертикальную прокрутку колесом прокидываем странице
+  React.useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      // если пользователь крутит ВЕРТИКАЛЬНО — не скроллим таблицу, а двигаем страницу
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault(); // нужно добавить passive:false при подписке
+        window.scrollBy({ top: e.deltaY, left: 0, behavior: 'auto' });
+      }
+      // горизонталь (deltaX) оставляем таблице по умолчанию
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
   return (
     <div className="rounded-3xl p-4" style={{ background: theme.panel, border: `1px solid ${theme.border}` }}>
       <div className="flex items-center justify-between mb-3">
-        <div className="text-base font-semibold" style={{ color: theme.heading }}>
-          Сравнение программ
-        </div>
-        <button onClick={onReset} className="px-3 py-1.5 rounded-xl text-sm glass pressable">
-          Сбросить
-        </button>
+        <div className="text-base font-semibold" style={{ color: theme.heading }}>Сравнение программ</div>
+        <button onClick={onReset} className="px-3 py-1.5 rounded-xl text-sm glass pressable">Сбросить</button>
       </div>
 
-      <div className="table-scroll">
+      <div ref={wrapRef} className="table-scroll rounded-2xl">
         <table className="min-w-full text-[13px] md:text-sm leading-snug border-collapse">
           <thead>
             <tr className="text-left">
-              <th className="p-2 font-medium sticky-col" style={{ color: theme.heading }}>
-                Критерий
-                </th>
+              {/* Левый столбец — чистый фон, без блюра */}
+              <th className="p-2 font-medium sticky-col" style={{ color: theme.heading }}>Критерий</th>
+
+              {/* Названия программ — по левому краю */}
               {data.map(p => (
                 <th key={p.id} className="p-2 font-medium program-head" style={{ color: theme.heading }}>
                   {p.title}
@@ -661,9 +677,7 @@ function BottomSheet({title, onClose, children, theme}){
           <tbody>
             {criteria.map(row => (
               <tr key={row.key} className="border-t" style={{ borderColor: theme.border }}>
-                <td className="p-2 font-medium sticky-col" style={{ color: theme.heading }}>
-                  {row.label}
-                </td>
+                <td className="p-2 font-medium sticky-col" style={{ color: theme.heading }}>{row.label}</td>
                 {data.map(p => (
                   <td key={p.id} className="p-2 text-xs md:text-sm align-top" style={{ color: theme.text }}>
                     {row.get(p)}
@@ -677,7 +691,7 @@ function BottomSheet({title, onClose, children, theme}){
     </div>
   );
 }
-
+    
   function IntroBlocks({theme}){
     return (
       <div className="grid md:grid-cols-2 gap-3">

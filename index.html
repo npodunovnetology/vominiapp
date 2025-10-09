@@ -583,45 +583,65 @@ function BottomSheet({title, onClose, children, theme}){
     );
   }
 
-  function CompareTable({ids,onReset,theme}){
-    const data=PROGRAMS.filter(p=>ids.includes(p.id)); if(!data.length) return null;
-    return (
-      <div className="rounded-3xl p-4" style={{background:theme.panel,border:`1px solid ${theme.border}`}}>
-        <div className="flex items-center justify-between">
-          <div className="text-base font-semibold" style={{color:theme.heading}}>Сравнение программ</div>
-          <button onClick={onReset} className="px-3 py-1.5 rounded-xl text-sm glass pressable">Сбросить</button>
+  function CompareTable({ ids, onReset, theme }) {
+  const data = PROGRAMS.filter(p => ids.includes(p.id));
+  if (!data.length) return null;
+
+  // Критерии для строк
+  const criteria = [
+    { key: "partners", label: "Вуз-партнёр", get: p => p.partners.join(", ") },
+    { key: "start_date", label: "Старт", get: p => dstr(p.start_date) },
+    { key: "duration", label: "Длительность", get: p => monthsStr(p.duration_months_est) },
+    { key: "price_full_rub", label: "Цена", get: p => `${rub(p.price_full_rub)} ₽` },
+    { key: "price_from_per_month_rub", label: "От ₽/мес", get: p => `${rub(p.price_from_per_month_rub)} ₽` },
+    { key: "skills", label: "Ключевые навыки", get: p => p.skills.join(" · ") },
+    { key: "diploma", label: "Документ", get: p => p.diploma },
+  ];
+
+  return (
+    <div className="rounded-3xl p-4" style={{ background: theme.panel, border: `1px solid ${theme.border}` }}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-base font-semibold" style={{ color: theme.heading }}>
+          Сравнение программ
         </div>
-        <div className="table-scroll mt-3 rounded-2xl">
-          <table className="min-w-[900px] w-full text-sm leading-snug sticky-first">
-            <thead>
-              <tr className="text-left">
-                <th className="pl-3 pr-3 py-2 col-title">Программа</th>
-                <th className="pr-3 py-2 w-[16%]">Вуз-партнёр</th>
-                <th className="pr-3 py-2 w-[12%]">Старт</th>
-                <th className="pr-3 py-2 w-[12%]">Длительность</th>
-                <th className="pr-3 py-2 w-[12%]">Цена</th>
-                <th className="pr-3 py-2 w-[14%]">От ₽/мес</th>
-                <th className="pr-3 py-2 w-[42%]">Навыки</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.map(p=>(
-                <tr key={p.id} className="border-t align-top" style={{borderColor:theme.border}}>
-                  <td className="pl-3 pr-3 py-2 font-medium col-title">{p.title}</td>
-                  <td className="pr-3 py-2">{p.partners.join(', ')}</td>
-                  <td className="pr-3 py-2">{dstr(p.start_date)}</td>
-                  <td className="pr-3 py-2">{monthsStr(p.duration_months_est)}</td>
-                  <td className="pr-3 py-2">{rub(p.price_full_rub)} ₽</td>
-                  <td className="pr-3 py-2">{rub(p.price_from_per_month_rub)} ₽</td>
-                  <td className="pr-3 py-2 opacity-90">{p.skills.join(' · ')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <button onClick={onReset} className="px-3 py-1.5 rounded-xl text-sm glass pressable">
+          Сбросить
+        </button>
       </div>
-    );
-  }
+
+      <div className="table-scroll">
+        <table className="min-w-full text-[13px] md:text-sm leading-snug border-collapse">
+          <thead>
+            <tr className="text-left">
+              <th className="p-2 font-medium sticky left-0 bg-opacity-80 backdrop-blur z-10" style={{ color: theme.heading }}>
+                Критерий
+              </th>
+              {data.map(p => (
+                <th key={p.id} className="p-2 text-center font-medium" style={{ color: theme.heading }}>
+                  {p.title}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {criteria.map(row => (
+              <tr key={row.key} className="border-t" style={{ borderColor: theme.border }}>
+                <td className="p-2 font-medium sticky left-0 bg-opacity-80 backdrop-blur z-10" style={{ color: theme.heading }}>
+                  {row.label}
+                </td>
+                {data.map(p => (
+                  <td key={p.id} className="p-2 text-xs md:text-sm align-top" style={{ color: theme.text }}>
+                    {row.get(p)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
   function IntroBlocks({theme}){
     return (

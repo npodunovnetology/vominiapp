@@ -109,13 +109,12 @@
 
 
     /* compare table */
-/* Только горизонтальный скролл внутри таблицы */
+/* таблица: горизонтальный скролл браузером, вертикаль отдадим странице через JS */
 .table-scroll{
-  overflow-x: auto;           /* листаем влево-вправо */
-  overflow-y: hidden;         /* вертикали у таблицы нет */
+  overflow-x: auto;           /* влево/вправо — нативно */
+  overflow-y: visible;        /* вверх/вниз — пусть страница */
   -webkit-overflow-scrolling: touch;
-  touch-action: auto;        /* вертикальные жесты отдать странице (мобилки) */
-  overscroll-behavior: auto;  /* разрешаем прокидку скролла родителю */
+  /* НИЧЕГО про touch-action / overscroll сейчас не ставим */
 }
     .sticky-first th:first-child,.sticky-first td:first-child{
       position:sticky;left:0;z-index:2;background:rgba(255,255,255,.92);
@@ -633,23 +632,60 @@ function BottomSheet({title, onClose, children, theme}){
     { key: "diploma", label: "Документ", get: p => p.diploma },
   ];
 
-  // обёртка для горизонтального скролла
   const wrapRef = React.useRef(null);
 
-  // ПК/тачпады: вертикальную прокрутку колесом прокидываем странице
+  // ПК: колесо мыши/тачпад — вертикаль прокидываем странице, горизонталь оставляем таблице
   React.useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
     const onWheel = (e) => {
-      // если пользователь крутит ВЕРТИКАЛЬНО — не скроллим таблицу, а двигаем страницу
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-        e.preventDefault(); // нужно добавить passive:false при подписке
+      const moreVertical = Math.abs(e.deltaY) > Math.abs(e.deltaX);
+      if (moreVertical) {
+        e.preventDefault(); // обязательно passive:false в подписке
         window.scrollBy({ top: e.deltaY, left: 0, behavior: 'auto' });
       }
-      // горизонталь (deltaX) оставляем таблице по умолчанию
+      // если больше горизонтали — пусть браузер сам скроллит .table-scroll по X
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // МОБИЛЬНЫЕ: управляем свайпом — вертикаль странице, горизонталь таблице
+  React.useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+
+    let lastX = 0, lastY = 0;
+
+    const onTouchStart = (e) => {
+      const t = e.touches[0];
+      lastX = t.clientX; lastY = t.clientY;
+    };
+
+    const onTouchMove = (e) => {
+      const t = e.touches[0];
+      const dx = t.clientX - lastX;
+      const dy = t.clientY - lastY;
+
+      if (Math.abs(dy) > Math.abs(dx)) {
+        // ВЕРТИКАЛЬ: скроллим страницу, а не таблицу
+        e.preventDefault();
+        window.scrollBy({ top: -dy, left: 0, behavior: 'auto' });
+      } else {
+        // ГОРИЗОНТАЛЬ: двигаем таблицу вручную
+        e.preventDefault();
+        el.scrollLeft -= dx;
+      }
+
+      lastX = t.clientX; lastY = t.clientY;
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false }); // важно!
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+    };
   }, []);
 
   return (
@@ -691,6 +727,7 @@ function BottomSheet({title, onClose, children, theme}){
     </div>
   );
 }
+
     
   function IntroBlocks({theme}){
     return (

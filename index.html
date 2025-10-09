@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Нетология ДПО — Mini-app (Liquid Glass)</title>
+    <title>Нетология ДПО — Mini-app (Liquid Glass, fixed)</title>
 
-    <!-- Telegram WebApp SDK (безопасный фолбэк) -->
+    <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <!-- Tailwind CSS -->
@@ -14,12 +14,12 @@
     <!-- React 18 UMD -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel для JSX (удобно для демо; в проде лучше собрать) -->
+    <!-- Babel for JSX (dev) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
       :root { --sab: env(safe-area-inset-bottom); }
-      /* ===== Liquid Glass helpers ===== */
+      /* Liquid glass helpers */
       .glass {
         background: rgba(255,255,255,0.16);
         backdrop-filter: blur(18px);
@@ -32,70 +32,34 @@
         -webkit-backdrop-filter: blur(24px);
         border: 1px solid rgba(255,255,255,0.28);
       }
-      .neon-ring { box-shadow: 0 0 0 1px rgba(255,255,255,.25), 0 8px 24px rgba(0,210,255,.25), inset 0 1px 0 rgba(255,255,255,.35); }
+      .neon-ring { box-shadow: 0 0 0 1px rgba(255,255,255,.25), 0 8px 24px rgba(0,210,255,.22), inset 0 1px 0 rgba(255,255,255,.35); }
       .pressable { transition: transform .08s ease, filter .2s ease, box-shadow .2s ease; }
       .pressable:active { transform: translateY(1px) scale(.995); filter: saturate(1.05); }
 
-      /* Таблица: на мобиле оставляем именно таблицу, даём скролл по X и липкий первый столбец */
+      /* Compare table: keep as table on mobile */
       .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
       .sticky-first th:first-child, .sticky-first td:first-child {
         position: sticky; left: 0; z-index: 2;
-        background: rgba(255,255,255,0.85);
-        backdrop-filter: blur(12px);
+        background: rgba(255,255,255,0.82);
+        backdrop-filter: blur(10px);
       }
       @media (prefers-color-scheme: dark) {
         .sticky-first th:first-child, .sticky-first td:first-child { background: rgba(20,20,20,0.72); }
       }
-
-      /* Фон-градиент «Нетологии» (из твоего референса) */
-      body {
-        min-height: 100vh;
-        background: radial-gradient(1200px 600px at 10% -10%, rgba(255,255,255,.6) 0%, rgba(255,255,255,0) 45%),
-                    linear-gradient(135deg, #A0E9FF 0%, #00D2FF 48%, #24B6FF 100%);
-      }
     </style>
   </head>
 
-  <body class="min-h-screen">
-    <!-- Декоративные «жидкие» лужицы (SVG, как в iOS Control Center) -->
-    <svg class="fixed inset-0 -z-10 w-full h-full pointer-events-none" aria-hidden="true">
-      <defs>
-        <!-- Градиент «Нетологии» для акцентов -->
-        <linearGradient id="netologyGradient" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#A0E9FF"/>
-          <stop offset="0.52" stop-color="#00D2FF"/>
-          <stop offset="1" stop-color="#24B6FF"/>
-        </linearGradient>
-        <!-- Мягкий голубой для подсветки -->
-        <radialGradient id="blobCyan" cx="50%" cy="50%" r="50%">
-          <stop offset="0" stop-color="#00D2FF" stop-opacity=".35"/>
-          <stop offset="1" stop-color="#00D2FF" stop-opacity="0"/>
-        </radialGradient>
-        <!-- Бирюзовый -->
-        <radialGradient id="blobMint" cx="50%" cy="50%" r="50%">
-          <stop offset="0" stop-color="#A0E9FF" stop-opacity=".35"/>
-          <stop offset="1" stop-color="#A0E9FF" stop-opacity="0"/>
-        </radialGradient>
-      </defs>
-      <g>
-        <circle cx="12%" cy="8%" r="220" fill="url(#blobMint)"/>
-        <circle cx="88%" cy="14%" r="260" fill="url(#blobCyan)"/>
-        <circle cx="92%" cy="82%" r="220" fill="url(#blobMint)"/>
-        <circle cx="10%" cy="88%" r="200" fill="url(#blobCyan)"/>
-      </g>
-    </svg>
-
+  <body class="min-h-screen bg-[color:var(--tg-theme-secondary-bg-color,#f6f7f8)]">
     <div id="root"></div>
 
     <script type="text/babel">
       const { useEffect, useMemo, useState } = React;
 
-      /* ========= Brand & theme ========= */
+      /* ===== Brand & Telegram theme ===== */
       const BRAND = {
-        primary: "#00D2FF",
-        heading: "#0b0b0b",
-        text: "#1f1f1f",
-        border: "rgba(255,255,255,.28)"
+        primary1: "#A0E9FF",
+        primary2: "#00D2FF",
+        primary3: "#24B6FF",
       };
 
       const getTG = () => (typeof window !== 'undefined' ? window?.Telegram?.WebApp : undefined);
@@ -112,7 +76,6 @@
       const haptic = {
         light: () => getTG()?.HapticFeedback?.impactOccurred?.('light'),
         selection: () => getTG()?.HapticFeedback?.selectionChanged?.(),
-        success: () => getTG()?.HapticFeedback?.notificationOccurred?.('success'),
       };
 
       function getThemeFromTG() {
@@ -120,13 +83,10 @@
         const dark = getTG()?.colorScheme === 'dark';
         return {
           dark,
-          bg: 'transparent',
-          panel: dark ? 'rgba(20,22,24,.55)' : 'rgba(255,255,255,.55)',
-          panelStrong: dark ? 'rgba(30,32,36,.65)' : 'rgba(255,255,255,.7)',
           text: p.text_color || (dark ? '#ECECEC' : '#1f1f1f'),
           heading: p.text_color || (dark ? '#FFFFFF' : '#0b0b0b'),
-          border: p.section_separator_color || BRAND.border,
-          buttonText: p.button_text_color || '#FFFFFF',
+          panel: dark ? 'rgba(20,22,24,.55)' : 'rgba(255,255,255,.55)',
+          border: p.section_separator_color || 'rgba(0,0,0,.08)',
         };
       }
       function useTelegramTheme() {
@@ -140,7 +100,7 @@
         return theme;
       }
 
-      /* ========= Data ========= */
+      /* ===== Data (пример — добавь остальные по той же схеме) ===== */
       const PROGRAMS = [
         {
           id: 'dpo-python-mfti',
@@ -150,19 +110,15 @@
           duration_months_est: 7,
           price_full_rub: 158400,
           price_from_per_month_rub: 6947,
-          landing_url: 'https://netology.ru/programs/razrabotchik-на-python-с-mfti',
+          landing_url: 'https://netology.ru/programs/razrabotchik-na-python-s-mfti',
           audience: [
             'Новичкам, которые хотят войти в разработку на Python',
             'Аналитикам и инженерам для автоматизации задач',
-            'Специалистам смежных областей (QA, DevOps, BI)'
+            'Специалистам смежных ролей (QA, DevOps, BI)',
           ],
           diploma: 'Два диплома о профпереподготовке: МФТИ и Нетологии',
-          learn: [
-            'Python, ООП, API, БД',
-            'Web/скрипты/боты, деплой',
-            'Проект от идеи до MVP'
-          ],
-          about: 'Путь от базового кода до работающего прототипа с питчем.'
+          learn: ['Python, API, БД', 'Web/боты/деплой', 'Проект от идеи до MVP'],
+          about: 'Путь от базового кода до работающего прототипа и питча.',
         },
         {
           id: 'dpo-ai-pm-mfti',
@@ -176,46 +132,47 @@
           audience: [
             'Менеджерам и продактам, запускающим AI-инициативы',
             'Руководителям, внедряющим ИИ',
-            'Координаторам ML/DS-команд'
+            'Координаторам ML/DS-команд',
           ],
           diploma: 'Два удостоверения о повышении квалификации: МФТИ и Нетологии',
-          learn: [
-            'Цикл AI-проекта и внедрение',
-            'Оценка эффекта, рисков, соответствия',
-            'Коммуникация бизнес ↔ ML-команда'
-          ],
-          about: 'Системный менеджмент AI-проектов от постановки до релиза.'
+          learn: ['Цикл AI-проекта', 'Оценка эффекта и рисков', 'Коммуникация бизнес ↔ ML'],
+          about: 'Системный менеджмент AI-проектов от постановки до релиза.',
         },
-        /* добавь остальные программы по желанию — структура та же */
       ];
+
       const rub = (n) => new Intl.NumberFormat('ru-RU').format(n);
       const dstr = (s) => new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
 
-      /* ========= UI primitives ========= */
+      /* ===== UI Primitives ===== */
       const Chip = ({children}) => (
-        <span className="px-2 py-1 rounded-full text-[11px] leading-none glass neon-ring text-gray-900/90 dark:text-white/90">
+        <span className="px-2 py-1 rounded-full text-[11px] leading-none glass neon-ring text-gray-900/85 dark:text-white/90">
           {children}
         </span>
       );
 
       function TopBar({ theme }) {
+        const gradient = `linear-gradient(90deg, ${BRAND.primary2}, ${BRAND.primary3})`;
         return (
-          <div className="sticky top-0 z-20">
+          <div className="sticky top-0 z-20" style={{ backdropFilter: 'saturate(140%) blur(6px)' }}>
             <div className="mx-auto max-w-5xl px-4 pt-[max(12px,env(safe-area-inset-top))] pb-3">
-              <div className="glass neon-ring rounded-2xl px-3 py-2 flex items-center justify-between pressable">
-                <div className="flex items-center gap-2">
-                  <!-- простая текстовая версия логотипа, можно заменить на твой SVG -->
-                  <span className="text-sm font-semibold bg-clip-text text-transparent" style={{backgroundImage: 'url(#)'}} >
-                    <span style="background:linear-gradient(90deg,#111, #333); -webkit-background-clip:text; background-clip:text;">Нетология · ДПО</span>
-                  </span>
+              <div className="rounded-2xl px-3 py-2 pressable neon-ring" style={{ background: theme.panel }}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-sm md:text-base font-semibold text-transparent bg-clip-text select-none"
+                      style={{ backgroundImage: gradient, WebkitBackgroundClip: 'text' }}
+                    >
+                      Нетология · ДПО
+                    </span>
+                  </div>
+                  <button
+                    className="px-3 py-1.5 rounded-xl text-sm text-white pressable"
+                    style={{ backgroundImage: gradient }}
+                    onClick={() => openTelegram('https://t.me/netology')}
+                  >
+                    Написать менеджеру
+                  </button>
                 </div>
-                <button
-                  className="px-3 py-1.5 rounded-xl text-sm text-white pressable"
-                  style={{ background: 'url(#)', backgroundImage: 'linear-gradient(90deg,#00D2FF,#24B6FF)' }}
-                  onClick={() => openTelegram('https://t.me/netology')}
-                >
-                  Написать менеджеру
-                </button>
               </div>
             </div>
           </div>
@@ -236,7 +193,7 @@
 
         return (
           <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
-            <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+            <div className="absolute inset-0 bg-black/45" onClick={onClose} />
             <div className="relative w-full md:max-w-2xl md:rounded-3xl glass-strong neon-ring md:shadow-2xl">
               <div className="p-4 md:p-6">
                 <div className="flex items-start justify-between gap-3">
@@ -252,8 +209,9 @@
 
       function ProgramCard({ p, onCompareToggle, selected, theme }) {
         const [open, setOpen] = useState(false);
+        const gradient = `linear-gradient(90deg, ${BRAND.primary2}, ${BRAND.primary3})`;
         return (
-          <div className="glass neon-ring rounded-3xl p-4 md:p-5 pressable">
+          <div className="rounded-3xl p-4 md:p-5 pressable neon-ring" style={{ background: theme.panel }}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-base md:text-lg font-semibold" style={{color: theme.heading}}>
@@ -269,7 +227,7 @@
               </div>
               <button
                 onClick={() => onCompareToggle(p.id)}
-                className={`px-3 py-2 rounded-xl text-xs md:text-sm glass neon-ring pressable ${selected ? 'font-semibold' : ''}`}
+                className={`px-3 py-2 rounded-xl text-xs md:text-sm pressable glass ${selected ? 'font-semibold' : ''}`}
               >
                 {selected ? 'В сравнении' : 'Сравнить'}
               </button>
@@ -278,7 +236,7 @@
             <div className="mt-4 flex gap-2">
               <button
                 className="flex-1 py-2 rounded-xl text-white pressable"
-                style={{ backgroundImage: 'linear-gradient(90deg,#00D2FF,#24B6FF)'}}
+                style={{ backgroundImage: gradient }}
                 onClick={() => openUrl(p.landing_url)}
               >
                 Открыть программу
@@ -316,7 +274,7 @@
                 <div className="mt-5 flex flex-wrap gap-2">
                   <button
                     className="px-4 py-2 rounded-xl text-white pressable"
-                    style={{ backgroundImage: 'linear-gradient(90deg,#00D2FF,#24B6FF)'}}
+                    style={{ backgroundImage: gradient }}
                     onClick={() => openUrl(p.landing_url)}
                   >
                     Перейти на сайт
@@ -334,13 +292,12 @@
         );
       }
 
-      /* ======== Compare Table — всегда таблица, с горизонтальным скроллом на мобиле ======== */
       function CompareTable({ ids, onReset, theme }) {
         const data = PROGRAMS.filter(p => ids.includes(p.id));
         if (!data.length) return null;
 
         return (
-          <div className="glass neon-ring rounded-3xl p-4">
+          <div className="rounded-3xl p-4 neon-ring" style={{ background: theme.panel }}>
             <div className="flex items-center justify-between gap-2">
               <div className="text-base font-semibold" style={{color: theme.heading}}>Сравнение программ</div>
               <button onClick={onReset} className="px-3 py-1.5 rounded-xl text-sm glass pressable">Сбросить</button>
@@ -361,14 +318,14 @@
                 </thead>
                 <tbody>
                   {data.map(p => (
-                    <tr key={p.id} className="border-t border-white/30">
+                    <tr key={p.id} className="border-t border-black/10 dark:border-white/20 align-top">
                       <td className="py-2 pr-3 font-medium">{p.title}</td>
                       <td className="py-2 pr-3">{p.partners.join(', ')}</td>
                       <td className="py-2 pr-3">{dstr(p.start_date)}</td>
                       <td className="py-2 pr-3">{p.duration_months_est} мес</td>
                       <td className="py-2 pr-3">{rub(p.price_full_rub)} ₽</td>
                       <td className="py-2 pr-3">{rub(p.price_from_per_month_rub)} ₽</td>
-                      <td className="py-2 pr-3"><span className="opacity-90">{p.learn.join(' · ')}</span></td>
+                      <td className="py-2 pr-3 opacity-90">{p.learn.join(' · ')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -378,7 +335,6 @@
         );
       }
 
-      /* ========= Filters ========= */
       function Filters({ partner, setPartner, theme }) {
         const partners = useMemo(() => {
           const set = new Set();
@@ -398,7 +354,6 @@
         );
       }
 
-      /* ========= App ========= */
       function App() {
         const [partner, setPartner] = useState('Все вузы');
         const [compareIds, setCompareIds] = useState([]);
@@ -415,7 +370,6 @@
           () => PROGRAMS.filter(p => partner === 'Все вузы' || p.partners.includes(partner)),
           [partner]
         );
-
         const toggleCompare = (id) =>
           setCompareIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id].slice(-4)));
 
@@ -427,12 +381,12 @@
                 <h1 className="text-lg md:text-xl font-semibold" style={{color: theme.heading}}>
                   Программы ДПО с дипломом вуза
                 </h1>
-                <p className="opacity-90 text-sm md:text-base">
-                  Усильте резюме и подтвердите навыки документами партнёрского вуза и Нетологии.
+                <p className="opacity-90 text-sm md:text-base" style={{color: theme.text}}>
+                  Перетащили подробности внутрь модалки, а карточки сделали легче.
                 </p>
               </header>
 
-              <section className="mt-3">
+              <section className="mt-2">
                 <Filters partner={partner} setPartner={setPartner} theme={theme} />
               </section>
 
@@ -446,7 +400,7 @@
                 ))}
               </section>
 
-              <footer className="text-center text-xs opacity-80 mt-8">
+              <footer className="text-center text-xs opacity-80 mt-8" style={{color: theme.text}}>
                 Информация не является публичной офертой. Уточняйте условия у менеджера.
               </footer>
             </main>

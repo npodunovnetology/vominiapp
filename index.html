@@ -157,6 +157,34 @@
       .logo-wrap{filter:invert(1)}
     }
 
+/* --- Закреплённый первый столбец без размытия --- */
+.sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.96); /* светлая тема */
+  box-shadow: 6px 0 10px -6px rgba(0, 0, 0, 0.1); /* лёгкая тень справа */
+}
+@media (prefers-color-scheme: dark) {
+  .sticky-col {
+    background: rgba(18, 20, 24, 0.98); /* тёмная тема */
+    box-shadow: 6px 0 10px -6px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* --- Чтобы мини-апп не смахивался, когда скроллим таблицу --- */
+.table-scroll {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; /* свайп остаётся внутри таблицы */
+}
+
+/* --- Названия программ по левому краю --- */
+.program-head {
+  text-align: left;
+}
+
+    
     /* скидка: выделенная карточка с градиентной подложкой */
     .discount{
       background-image: linear-gradient(90deg,var(--g1),var(--g2));
@@ -613,11 +641,11 @@ function BottomSheet({title, onClose, children, theme}){
         <table className="min-w-full text-[13px] md:text-sm leading-snug border-collapse">
           <thead>
             <tr className="text-left">
-              <th className="p-2 font-medium sticky left-0 bg-opacity-80 backdrop-blur z-10" style={{ color: theme.heading }}>
+              <th className="p-2 font-medium sticky-col" style={{ color: theme.heading }}>
                 Критерий
-              </th>
+                </th>
               {data.map(p => (
-                <th key={p.id} className="p-2 text-center font-medium" style={{ color: theme.heading }}>
+                <th key={p.id} className="p-2 font-medium program-head" style={{ color: theme.heading }}>
                   {p.title}
                 </th>
               ))}
@@ -626,7 +654,7 @@ function BottomSheet({title, onClose, children, theme}){
           <tbody>
             {criteria.map(row => (
               <tr key={row.key} className="border-t" style={{ borderColor: theme.border }}>
-                <td className="p-2 font-medium sticky left-0 bg-opacity-80 backdrop-blur z-10" style={{ color: theme.heading }}>
+                <td className="p-2 font-medium sticky-col" style={{ color: theme.heading }}>
                   {row.label}
                 </td>
                 {data.map(p => (
